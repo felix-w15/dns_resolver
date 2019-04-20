@@ -1,0 +1,10 @@
+﻿  main.cpp
+  pkg_pro.cpp
+c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(217): warning C4778: “printf”: 格式字符串“%\n”未终止
+c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(218): warning C4476: "printf": 格式说明符中的类型字段字符“\n”未知
+c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(254): warning C4778: “printf”: 格式字符串“%\n”未终止
+c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(255): warning C4778: “printf”: 格式字符串“%\n”未终止
+c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(256): warning C4778: “printf”: 格式字符串“%\n”未终止
+  正在生成代码...
+  DNS_resolver.vcxproj -> C:\Users\wuxin\Desktop\计算机网络课程设计\dns_resolver2.0\DNS_resolver\DNS_resolver\Debug\DNS_resolver.exe
+  DNS_resolver.vcxproj -> C:\Users\wuxin\Desktop\计算机网络课程设计\dns_resolver2.0\DNS_resolver\DNS_resolver\Debug\DNS_resolver.pdb (Full PDB)
