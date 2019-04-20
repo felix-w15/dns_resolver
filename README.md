@@ -1,2 +1,3 @@
-# dns_resolver
-dns中继器
+﻿# dns中继器  
+用vs打开在项目->属性->链接器->附加依赖性中添加SQLite3.lib;  
+
