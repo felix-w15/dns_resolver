@@ -10,8 +10,9 @@
 
 #define BUFFER_SIZE 1024
 #define QNAME_MAX_LENTH 256
-
 #define SUPERIOR_SERVER_ADDRESS 10.3.9.6
+
+using namespace std;
 
 typedef struct
 {
@@ -40,6 +41,14 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip);//请
 void query_for_superior_server(char *receiveBuffer);//转发至高一级域名服务器
 
 void resp_pro(dns_header *header, char *receiveBuffer);//响应包处理
+
+void query_record(sqlite3 *db, char *zErrMsg, string domainName);
+
+void query_cnamerecord(sqlite3 *db, char *zErrMsg, string domainName);
+
+void query_mxrecord(sqlite3 *db, char *zErrMsg, string domainName);
+
+void query_nsrecord(sqlite3 *db, char *zErrMsg, string domainName);
 
 //*******************************************************
 int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *receiveBuffer);//域名解析

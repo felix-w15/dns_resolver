@@ -4,7 +4,7 @@
 #include"pkg_pro.h"
 
 
-using namespace std;
+
 
 SOCKADDR_IN client_ip[IDTABLE_SIZE];//存放客户机的ip地址，用以发答复包以及并发处理
 
@@ -354,7 +354,7 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 
 }
 
-void queryARecord(sqlite3 *db, char *zErrMsg, string domainName)
+void query_record(sqlite3 *db, char *zErrMsg, string domainName)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;
@@ -376,7 +376,7 @@ void queryARecord(sqlite3 *db, char *zErrMsg, string domainName)
 	}
 }
 
-void queryCNAMERecord(sqlite3 *db, char *zErrMsg, string domainName)
+void query_cnamerecord(sqlite3 *db, char *zErrMsg, string domainName)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;
@@ -398,7 +398,7 @@ void queryCNAMERecord(sqlite3 *db, char *zErrMsg, string domainName)
 	}
 }
 
-void queryMXRecord(sqlite3 *db, char *zErrMsg, string domainName)
+void query_mxrecord(sqlite3 *db, char *zErrMsg, string domainName)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;
@@ -421,7 +421,7 @@ void queryMXRecord(sqlite3 *db, char *zErrMsg, string domainName)
 	}
 }
 
-void queryNSRecord(sqlite3 *db, char *zErrMsg, string domainName)
+void query_nsrecord(sqlite3 *db, char *zErrMsg, string domainName)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;

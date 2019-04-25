@@ -1,10 +1,17 @@
-﻿  main.cpp
-  pkg_pro.cpp
-c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(217): warning C4778: “printf”: 格式字符串“%\n”未终止
-c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(218): warning C4476: "printf": 格式说明符中的类型字段字符“\n”未知
-c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(254): warning C4778: “printf”: 格式字符串“%\n”未终止
-c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(255): warning C4778: “printf”: 格式字符串“%\n”未终止
-c:\users\wuxin\desktop\计算机网络课程设计\dns_resolver2.0\dns_resolver\dns_resolver\pkg_pro.cpp(256): warning C4778: “printf”: 格式字符串“%\n”未终止
+﻿  pkg_pro.cpp
+e:\github\dns_resolver\pkg_pro.cpp(27): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  c:\program files (x86)\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: 参见“inet_addr”的声明
+e:\github\dns_resolver\pkg_pro.cpp(217): warning C4778: “printf”: 格式字符串“%\n”未终止
+e:\github\dns_resolver\pkg_pro.cpp(218): warning C4476: "printf": 格式说明符中的类型字段字符“\n”未知
+e:\github\dns_resolver\pkg_pro.cpp(254): warning C4778: “printf”: 格式字符串“%\n”未终止
+e:\github\dns_resolver\pkg_pro.cpp(255): warning C4778: “printf”: 格式字符串“%\n”未终止
+e:\github\dns_resolver\pkg_pro.cpp(256): warning C4778: “printf”: 格式字符串“%\n”未终止
+  main.cpp
   正在生成代码...
-  DNS_resolver.vcxproj -> C:\Users\wuxin\Desktop\计算机网络课程设计\dns_resolver2.0\DNS_resolver\DNS_resolver\Debug\DNS_resolver.exe
-  DNS_resolver.vcxproj -> C:\Users\wuxin\Desktop\计算机网络课程设计\dns_resolver2.0\DNS_resolver\DNS_resolver\Debug\DNS_resolver.pdb (Full PDB)
+  SQLite3.lib(sqlite3.obj) : 找到 MSIL .netmodule 或使用 /GL 编译的模块；正在使用 /LTCG 重新启动链接；将 /LTCG 添加到链接命令行以改进链接器性能
+LINK : warning LNK4075: 忽略“/INCREMENTAL”(由于“/LTCG”规范)
+LINK : warning LNK4098: 默认库“MSVCRT”与其他库的使用冲突；请使用 /NODEFAULTLIB:library
+  正在生成代码
+  已完成代码的生成
+SQLite3.lib(sqlite3.obj) : warning LNK4204: “E:\github\dns_resolver\Debug\vc141.pdb”缺少引用模块的调试信息；正在链接对象，如同没有调试信息一样
+  DNS_resolver.vcxproj -> E:\github\dns_resolver\Debug\DNS_resolver.exe
