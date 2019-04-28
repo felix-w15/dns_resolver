@@ -319,20 +319,19 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			char storeData[BUFFER_SIZE];
 			char *zErrMsg = 0;
 
-			
 			int TTL = (int)*ttl;
 			int ttlLen = (std::to_string(TTL)).length();
-			printf("TTL:%d-------\n", TTL);
 			int doNameLen = str_len(doName);
 			int aliasLen = str_len(doname);
 			int lenth[7];//各项资源长度数据	
 
 			lenth[0] = doNameLen;//域名长度
 			lenth[1] = aliasLen;//别名长度
-			
 			lenth[3] = 2;//class长度
 			lenth[4] = ttlLen;
-			
+
+			printf("    dataLenth: %d\n", doNameLen);
+			printf("    TTL:%d\n", TTL);
 			if (*type == 1)
 			{//IP地址类型
 				unsigned char ip_address[4];
@@ -352,8 +351,6 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				lenth[5] = 1;//DataLength字段长度
 				lenth[6] = ipLen;
 				const char *ipRes = ip.data();
-
-				printf("dataLenth: %d\n", doNameLen);
 
 				if(!query_A_record(db, zErrMsg,  doName, doNameLen, ipRes, ipLen))
 				    insert_A_record(db, zErrMsg, doName, doname, storeData, storeData + 1, TTL, 4, ipRes, lenth);
