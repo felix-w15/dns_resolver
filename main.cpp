@@ -11,17 +11,38 @@ int it_length = 0;//当前存入的ID数目
 int last;//接受数据的长度
 short int old_id_table[IDTABLE_SIZE];//原始ID表
 short int new_id_table[IDTABLE_SIZE];//更改后的ID表
+sqlite3 *db;//sqlite3数据库初始化信息
 
 SOCKET serverSocket;
+
+
+
+void init_database(sqlite3 *db, int rc)
+{
+	char *zErrMsg = 0;
+	//char *sql;
+
+	if (rc)
+	{
+		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+	}
+	else
+	{
+		fprintf(stderr, "Opened database successfully\n");
+	}
+}
 
 int main() {
 	WSADATA WSAData;//windows socket初始化信息
 	char receiveBuffer[BUFFER_SIZE];
-
-	//*********************************
+	int rc;
+	
+	rc = sqlite3_open("data.db", &db);
+ 
 	init_table(old_id_table, -1);//初始化原始ID表
 	init_table(new_id_table, -1);//初始化更改后的ID表
-	//*********************************
+	init_database(db, rc);//初始化数据库
+	
 
 	if (WSAStartup(MAKEWORD(2, 2), &WSAData) != 0)
 	{
@@ -65,12 +86,13 @@ int main() {
 			{
 				//printf("接收到数据（%s）：%s\n", inet_ntoa(addr_Clt.sin_addr), receBuf);
 				//printf("接收到数据（%s）\n", inet_ntoa(addr_Clt.sin_addr));				
-	/*			for (int i = 0; i < last; i++)
+	            /*			
+	            for (int i = 0; i < last; i++)
 				{
 					printf("%c ", receiveBuffer[i]);
 				}
-*/
-//创建header
+                */
+                //创建header
 				dns_header *header;
 				header = (dns_header *)receiveBuffer;
 				header->ID = ntohs(header->ID);
@@ -103,8 +125,8 @@ int main() {
 	}
 
 	closesocket(serverSocket);
-
-	WSACleanup();
+    WSACleanup();
+	sqlite3_close(db);
 	return 0;
 }
 
