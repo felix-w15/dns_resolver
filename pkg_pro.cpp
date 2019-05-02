@@ -1,12 +1,14 @@
 #include<stdlib.h>
 #include<stdio.h>
 
+
 #include"pkg_pro.h"
 
-
+stringstream sstream;
 
 SOCKADDR_IN client_ip[IDTABLE_SIZE];//´æ·Å¿Í»§»úµÄipµØÖ·£¬ÓÃÒÔ·¢´ğ¸´°üÒÔ¼°²¢·¢´¦Àí
 
+map<string, unsigned short> *mapDomainName;
 
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
@@ -39,6 +41,32 @@ string translate_IP(unsigned char* ip)//°ÑÒÔunsigned charÀàĞÍ´æ´¢µÄipµØÖ·×ª»»³É×
 	return result.substr(0, result.length() - 1);
 }
 
+void insert_IP(char *ip, char *sendBuf, int *bytePos)//½«ip´æÈë·¢ËÍ»º³åÇø
+{
+	int ipLen = str_len(ip);
+	string tmp = "";
+	for (int i = 0; i <= ipLen; i++)
+	{
+		if (i != ipLen && ip[i] != '.')
+		{
+			char s[2] = { ip[i], 0 };
+			string c = s;
+			tmp = tmp + c;
+		}
+		else//×ª»»³É×Ö½Ú´æÈë·¢ËÍ»º³åÇø
+		{
+			sstream.clear();//Çå¿Õsstream»º³åÇø
+			unsigned short singleIP;
+			sstream << tmp;
+			sstream >> singleIP;
+			sstream.str("");
+			sendBuf[*bytePos] = (char)singleIP;
+			*bytePos = *bytePos + 1;
+			tmp = "";
+		}
+	}
+}
+
 void init_table(short int t[], short int q)
 {
 	for (int i = 0; i < IDTABLE_SIZE; i++)
@@ -46,6 +74,204 @@ void init_table(short int t[], short int q)
 		t[i] = q;
 	}
 }
+
+void domainStore(char *domain, int len, int iniBytePos, string res)
+{	
+	if (len <= 0) return;
+	string tmp =  (res == "") ? "" : ('.' + res);
+	int index = len - 1;
+	while (index >= -1)
+	{
+		if (domain[index] != '.' && index != -1)//ÎªÓòÃû×Ö·û
+		{
+			char s[2] = { domain[index], 0 };
+			string c = s;
+			tmp = c + tmp;
+		}
+		else
+		{
+			unsigned short namePos = (unsigned short)(iniBytePos + index + 1);
+			mapDomainName->insert(pair<string, unsigned short>(tmp, namePos));
+			tmp = '.' + tmp;
+		}
+		index--;
+	}
+}
+
+void domain_pro(char* name, char *sendBuf, int *bytePos)
+{
+	int j = str_len(name) - 1;
+	int nameEndPos = j + 1;//²éÑ¯nameÊı×é½ØÖ¹µÄÎ»ÖÃ
+	unsigned short ptrPos;//Ö¸Õë¶¨Î»µÄÖµ
+	string tmp = "", res = "";
+	while (j >= -1)//ÓòÃûÑ¹Ëõ¶¨Î»
+	{
+		if (name[j] != '.' && j != -1)
+		{
+			char s[2] = { name[j], 0 };
+			string c = s;
+			tmp = c + tmp;
+		}
+		else//Åöµ½.ÔòÅĞ¶Ï¸ÃÓòÃûÊÇ·ñÒÑ¾­±£´æ
+		{
+			map<string, unsigned short>::iterator iter;
+			iter = mapDomainName->find(tmp);
+			if (iter != mapDomainName->end())
+			{
+				nameEndPos = j;
+				ptrPos = iter->second;
+				res = iter->first;
+			}
+			else
+				break;
+			tmp = '.' + tmp;
+		}
+		j--;
+	}
+	int i = 0, lastPos = 0, iniBytePos = *bytePos;
+	while (i <= (nameEndPos))//Èç¹ûÈ«¿ÉÒÔÓÃÖ¸ÕëÌæ´úÔò²»ĞèÒªÏÂÃæ´æµÄ²½Öè
+	{
+		if (name[i] == '.' or name[i] == '\0')
+		{
+			sendBuf[*bytePos] = i - lastPos;
+			for (int j = 0; j < i - lastPos; j++)//½«ÓòÃû·ÅÈë·¢ËÍ»º³åÇø
+			{
+				*bytePos = *bytePos + 1;
+				sendBuf[*bytePos] = name[j + lastPos];
+			}
+			*bytePos = *bytePos + 1;
+			lastPos = i + 1;
+		}
+		i++;
+	}
+	i--;//i¶¨Î»µ½'\0'
+	//½«Ö¸Õë·ÅÈë·¢ËÍ»º³åÇø
+	if (res != "")//Ê¹ÓÃÁËÖ¸Õë
+	{
+		sendBuf[*bytePos] = (char)192;
+		*bytePos = *bytePos + 1;
+
+		sendBuf[*bytePos] = (char)ptrPos;
+		*bytePos = *bytePos + 1;
+		//printf("%d-------------Ö¸Õë", sendBuf[*bytePos]);
+		
+	}
+	else
+	{
+		sendBuf[*bytePos] = 0;
+		*bytePos = *bytePos + 1;
+	}
+	
+
+	//ÓòÃû-×Ö½ÚÎ»ÖÃ´æ´¢
+	domainStore(name, i, iniBytePos, res);
+}
+
+void a_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
+{
+	for (int i = 0; i < len; i++)
+	{
+		domain_pro(records[i].NAME, sendBuf, bytePos);//ÓòÃû´¦Àí
+		sendBuf[*bytePos + 1] = (char)(records[i].TYPE);
+		sendBuf[*bytePos + 0] = (records[i].TYPE) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 1] = (char)(records[i].CLASS);
+		sendBuf[*bytePos + 0] = (records[i].CLASS) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 3] = (char)(records[i].TTL);
+		sendBuf[*bytePos + 2] = (char)((records[i].TTL) >> 8);
+		sendBuf[*bytePos + 1] = (char)((records[i].TTL) >> 16);
+		sendBuf[*bytePos + 0] = (records[i].TTL) >> 24;
+		*bytePos = *bytePos + 4;
+		sendBuf[*bytePos + 1] = (char)records[i].DATALENGTH;
+		sendBuf[*bytePos + 0] = records[i].DATALENGTH >> 8;
+		*bytePos = *bytePos + 2;
+		insert_IP(records[i].RDATA, sendBuf, bytePos);
+	}
+	//test
+	int t = 0;
+	printf("\n*-*-*-*-*my-*-*-*-*\n");
+
+	while (t < *bytePos)
+	{
+		if (sendBuf[t] >= 65)
+		{
+			printf("%c", sendBuf[t]);
+
+		}
+		else
+			printf("%hx-", sendBuf[t]);
+		t++;
+	}
+	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
+}
+
+void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
+{
+	resRecord newRecord = record;
+	char *cname = record.NAME;
+	char *zErrMsg = 0;
+	while (query_CNAME_record(db, zErrMsg, cname, str_len(cname), &newRecord))
+	{
+		domain_pro(newRecord.NAME, sendBuf, bytePos);//ÓòÃû´¦Àí
+		sendBuf[*bytePos + 1] = (char)(newRecord.TYPE);
+		sendBuf[*bytePos + 0] = (newRecord.TYPE) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 1] = (char)(newRecord.CLASS);
+		sendBuf[*bytePos + 0] = (newRecord.CLASS) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 3] = (char)(newRecord.TTL);
+		sendBuf[*bytePos + 2] = (char)((newRecord.TTL) >> 8);
+		sendBuf[*bytePos + 1] = (char)((newRecord.TTL) >> 16);
+		sendBuf[*bytePos + 0] = (newRecord.TTL) >> 24;
+		*bytePos = *bytePos + 4;
+		sendBuf[*bytePos + 1] = (char)newRecord.DATALENGTH;
+		sendBuf[*bytePos + 0] = newRecord.DATALENGTH >> 8;
+		*bytePos = *bytePos + 2;
+		domain_pro(newRecord.RDATA, sendBuf, bytePos);//ÓòÃû´¦Àí
+		cname = newRecord.RDATA;//¼ÌĞø²éÑ¯ÏÂÒ»¸öCN
+	}
+	//test
+	int t = 0;
+	printf("\n*-*-*-*-*my-*-*-*-*\n");
+	while (t < *bytePos)
+	{
+		if (sendBuf[t] >= 65)
+		{
+			printf("%c", sendBuf[t]);
+
+		}
+		else
+			printf("%hx-", sendBuf[t]);
+		t++;
+	}
+	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
+}
+
+void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len)//cn_records_proÖØÔØ£¬Ö»Ö´ĞĞÒ»´Î
+{
+	resRecord newRecord = record;
+	char *cname = record.NAME;
+	char *zErrMsg = 0;
+	domain_pro(newRecord.NAME, sendBuf, bytePos);//ÓòÃû´¦Àí
+	sendBuf[*bytePos + 1] = (char)(newRecord.TYPE);
+	sendBuf[*bytePos + 0] = (newRecord.TYPE) >> 8;
+	*bytePos = *bytePos + 2;
+	sendBuf[*bytePos + 1] = (char)(newRecord.CLASS);
+	sendBuf[*bytePos + 0] = (newRecord.CLASS) >> 8;
+	*bytePos = *bytePos + 2;
+	sendBuf[*bytePos + 3] = (char)(newRecord.TTL);
+	sendBuf[*bytePos + 2] = (char)((newRecord.TTL) >> 8);
+	sendBuf[*bytePos + 1] = (char)((newRecord.TTL) >> 16);
+	sendBuf[*bytePos + 0] = (newRecord.TTL) >> 24;
+	*bytePos = *bytePos + 4;
+	sendBuf[*bytePos + 1] = (char)newRecord.DATALENGTH;
+	sendBuf[*bytePos + 0] = newRecord.DATALENGTH >> 8;
+	*bytePos = *bytePos + 2;
+	domain_pro(newRecord.RDATA, sendBuf, bytePos);//ÓòÃû´¦Àí
+	
+}
+
 
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip)
 {
@@ -117,14 +343,9 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 		}
 	}
 	header->ID = nhid;//½«ĞÂID×Ö¶Î¸³¸ø°üÍ·
-
-	//½«ÊÕµ½headerÖĞ×Ö½ÚĞò¸ÄÎªÍøÂç×Ö½ÚĞò
 	header->ID = htons(header->ID);
-	header->FLAGS = htons(header->FLAGS);
-	header->QDCOUNT = htons(header->QDCOUNT);
-	header->ANCOUNT = htons(header->ANCOUNT);
-	header->NSCOUNT = htons(header->NSCOUNT);
-	header->ARCOUNT = htons(header->ARCOUNT);
+	
+	
 
 	SOCKADDR_IN to_address;
 	int addr_len = sizeof(SOCKADDR_IN);
@@ -159,8 +380,15 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 			QNAME[now_pos++] = '.';
 	}
 	QNAME[now_pos] = '\0';
-	//	printf("%s\n", QNAME);
+
+	//½«ÊÕµ½headerÖĞ×Ö½ÚĞò¸ÄÎªÍøÂç×Ö½ÚĞò
 	
+	header->FLAGS = htons(header->FLAGS);
+	header->QDCOUNT = htons(header->QDCOUNT);
+	header->ANCOUNT = htons(header->ANCOUNT);
+	header->NSCOUNT = htons(header->NSCOUNT);
+	header->ARCOUNT = htons(header->ARCOUNT);
+
 	/*ÅĞ¶Ï±¾µØÊı¾İ¿âÊÇ·ñ´æÓĞ¸ÃÓòÃû¼ÇÂ¼*/
 	char doName[QNAME_MAX_LENTH];//²éÑ¯ÓòÃû»òÓÊ¼şµØÖ·ºó×ºÃû
 	int length = 0;//ÓòÃû»òÓÊ¼şµØÖ·ºó×ºÃûÕ¼ÓÃµÄ×Ö½ÚÊı
@@ -174,35 +402,116 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 
 	int tp = ntohs(*type);
 	printf("ÇëÇó²éÑ¯ÀàĞÍ: %d\n",tp);
-
-	int doNameLen = str_len(doName);
-
-
 	char *zErrMsg = 0;
+
+	char *sendBuf = new char[BUFFER_SIZE];//·¢ËÍ»º³åÇø
+	int bytePos = last;//·¢ËÍ»º³åÇøµ±Ç°Ìî³äÊı¾İµÄÎ»ÖÃ
+	
+	delete mapDomainName;//½¨Á¢ĞÂ¡°ÓòÃû-×Ö½ÚÎ»ÖÃ¡±×ÖµäÖ®Ç°£¬½«Ö®Ç°×ÖµäÉ¾³ı
+	mapDomainName = new map<string, unsigned short>;//ÓÃÀ´½¨Á¢Ñ¹Ëõ¹æÔòµÄ×Öµä
+
 	if(tp == 1)//ÎªAÀàĞÍ²éÑ¯ÇëÇó
-	{
-		int queryResult = query_A_record(db, zErrMsg, doName, doNameLen);
-		if (queryResult)//±¾µØÊı¾İ¿âÓĞ»º´æ,¸ø¿Í»§¶Ë·¢ËÍresponse°ü
+	{	
+		resRecord *cnameRecord;//´æ´¢cnameÀàĞÍ¼ÇÂ¼
+		cnameRecord = new resRecord;
+		int queryCNameRes = query_CNAME_record(db, zErrMsg, doName, str_len(doName), cnameRecord);
+		resRecord aRecord[RESO_MAX];//´æ´¢AÀàĞÍ¼ÇÂ¼
+		int queryAResult = query_A_record(db, zErrMsg, doName, str_len(doName), aRecord);
+		if (queryAResult)//±¾µØÊı¾İ¿âÓĞ»º´æ,¸ø¿Í»§¶Ë·¢ËÍresponse°ü
 		{
+			header->ID = htons(header->ID);
+			memcpy(sendBuf, receiveBuffer, last);//¿½±´N¸ö×Ö½Úµ½·¢ËÍ»º³åÇø
+			
+			//½«QNAME´æÈë×Öµä
+			domainStore(QNAME, str_len(QNAME), 12, "");//12ÎªQNAME¿ªÊ¼×Ö½ÚÊı
+			//printf("%s/*/*/*/%d*/*/*/\n", QNAME, str_len(QNAME));
+
+			unsigned short Flags = 0x8180;
+			unsigned short Questions = (unsigned short)1;
+			unsigned short Answer = (unsigned short)(queryCNameRes + queryAResult);
+			//printf("/*/*/*/%c*/*answer/*/\n", Answer);
+			//printf("/*/*/*/%u*/*/answer*/\n", Answer);
+			*(sendBuf + 3) = (char)Flags;
+			*(sendBuf + 2) = Flags >> 8;
+			*(sendBuf + 5) = (char)Questions;
+			*(sendBuf + 4) = Questions >> 8;
+			*(sendBuf + 7) = (char)Answer;
+			*(sendBuf + 6) = Answer >> 8;
+			//printf("/*/*/*/%d/*%d/*/\n", sendBuf[6], sendBuf[7]);
+
+			if (queryCNameRes)//Èç¹û´æÔÚCNÀàĞÍ¼ÇÂ¼
+			{
+				cn_records_pro(*cnameRecord, sendBuf, &bytePos);//cname¼ÇÂ¼´¦Àí³Édns°üÊı¾İÁ÷ĞÎÊ½²¢´æÈë·¢ËÍ»º³åÇø
+			}
+			a_records_pro(aRecord, queryAResult, sendBuf, &bytePos);
+
 			printf("±¾µØ´æÓĞ%sÓòÃûµÄAÀàĞÍ¼ÇÂ¼!\n\n", doName);
+			//×ª·¢¸ø¿Í»§»ú
+			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
 		}
 		else
 		{
 			query_for_superior_server(receiveBuffer, header, cli_ip);//Ïò¸ßÒ»¼¶ÓòÃû·şÎñÆ÷·¢ËÍ²éÑ¯
 		}
-		return;
+		if(!cnameRecord->NAME)
+			delete cnameRecord->NAME;
+		if(!cnameRecord->RDATA)
+			delete cnameRecord->RDATA;
+		delete cnameRecord;
 	}
-	//else if (*type == 5)//ÎªCNAMEÀàĞÍ²éÑ¯ÇëÇó
-	//{
+	else if (tp == 5)//CNAMEÇëÇó
+	{
+		resRecord *cnameRecord = new resRecord;//´æ´¢cnameÀàĞÍ¼ÇÂ¼
+		//cnameRecord ;
+		int queryCNameRes = query_CNAME_record(db, zErrMsg, doName, str_len(doName), cnameRecord);
+		if (queryCNameRes)
+		{
+			header->ID = htons(header->ID);
+			memcpy(sendBuf, receiveBuffer, last);//¿½±´N¸ö×Ö½Úµ½·¢ËÍ»º³åÇø
+			unsigned short Flags = 0x8180;
+			unsigned short Questions = (unsigned short)1;
+			unsigned short Answer = (unsigned short)1;
+			//printf("/*/*/*/%c*/*answer/*/\n", Answer);
+			//printf("/*/*/*/%u*/*/answer*/\n", Answer);
+			*(sendBuf + 3) = (char)Flags;
+			*(sendBuf + 2) = Flags >> 8;
+			*(sendBuf + 5) = (char)Questions;
+			*(sendBuf + 4) = Questions >> 8;
+			*(sendBuf + 7) = (char)Answer;
+			*(sendBuf + 6) = Answer >> 8;
 
-	//}
-
-	//Èç¹û¶¼Ã»ÓĞ¼ÇÂ¼ÔòÏò¸ßÒ»¼¶ÓòÃû·şÎñÆ÷²éÑ¯
-	query_for_superior_server(receiveBuffer, header, cli_ip);//Ïò¸ßÒ»¼¶ÓòÃû·şÎñÆ÷·¢ËÍ²éÑ¯
+			cn_records_pro(*cnameRecord, sendBuf, &bytePos, 1);//cname¼ÇÂ¼´¦Àí³Édns°üÊı¾İÁ÷ĞÎÊ½²¢´æÈë·¢ËÍ»º³åÇø
+			printf("±¾µØ´æÓĞ%sÓòÃûµÄCNAMEÀàĞÍ¼ÇÂ¼!\n\n", doName);
+			//×ª·¢¸ø¿Í»§»ú
+			
+			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
+		}
+		else
+		{
+			query_for_superior_server(receiveBuffer, header, cli_ip);//Ïò¸ßÒ»¼¶ÓòÃû·şÎñÆ÷·¢ËÍ²éÑ¯
+		}
+	}
+	else
+	  query_for_superior_server(receiveBuffer, header, cli_ip);//Ïò¸ßÒ»¼¶ÓòÃû·şÎñÆ÷·¢ËÍ²éÑ¯
 }
 
 void resp_pro(dns_header *header, char *receiveBuffer)
 {
+	int t = 0;
+	printf("\n*-*-*-*-recieve*-*-*-*-*\n");
+	while (t < last)
+	{
+		if (receiveBuffer[t] >= 65)
+		{
+			printf("%c", receiveBuffer[t]);
+
+		}
+		else
+			printf(" %hx ", receiveBuffer[t]);
+		t++;
+	}
+	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
+
 	//»¹Ô­DNSÊı¾İ°üÍ·ID
 	SOCKADDR_IN q_ip;//´Ë°üÓ¦»Ø¸´¸øµÄ¿Í»§»úip
 	short int hid = header->ID;
@@ -478,7 +787,7 @@ void connect_string(char *a, const char *b, int aLength, int bLength)
 void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, const char *Address, int *length)
 {
 	int sqlLength;
-	char temSql[4096] = "INSERT INTO A_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Address) VALUES (";
+	char temSql[SQL_MAX] = "INSERT INTO A_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Address) VALUES (";
 	sqlLength = strlen(temSql);
 	//temSql = temSql + "'" + domainName + "'" + ", " + "'" + ARecord + "'" + ", " + std::to_string(TTL) + ");";
 	connect_string(temSql, "'", sqlLength, 1);
@@ -528,7 +837,7 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
-	char sql[4096] = "SELECT * from A_RECORD where Name = '";
+	char sql[SQL_MAX] = "SELECT * from A_RECORD where Name = '";
 	sqlLength = strlen(sql);
 	connect_string(sql, Name, sqlLength, nameLength);
 	sqlLength += nameLength;
@@ -555,18 +864,17 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const
 	return res;
 } 
 
-int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
+int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
-	char sql[4096] = "SELECT * from A_RECORD where Name = '";
+	char sql[SQL_MAX] = "SELECT * from A_RECORD where Name = '";
 	sqlLength = strlen(sql);
 	connect_string(sql, Name, sqlLength, nameLength);
 	sqlLength += nameLength;
 	connect_string(sql, "';", sqlLength, 2);
 	sqlite3_prepare(db, sql, -1, &statement, NULL);
-	//printf("%s-------sql------\n", sql);
 	if (ret != SQLITE_OK)
 	{
 		printf("prepare error ret : %d\n", ret);
@@ -575,12 +883,28 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
 	int res = 0;
 	while (sqlite3_step(statement) == SQLITE_ROW)
 	{
-		char* domainName1 = (char *)sqlite3_column_text(statement, 0);
-		char* alias = (char *)sqlite3_column_text(statement, 1);
-		int TTL = sqlite3_column_int(statement, 4);
-		char *address = (char *)sqlite3_column_text(statement, 6);
+		char* domainName1 = (char *)sqlite3_column_text(statement, 1);
+		unsigned short type = 1;//×ÊÔ´ÀàĞÍÎªAÀàĞÍ
+		unsigned short cla = 1;//CLASS×Ö¶ÎÖµÎª1
+		unsigned long TTL = (unsigned long)sqlite3_column_int(statement, 4);
+		unsigned short dataLen = (unsigned short)sqlite3_column_int(statement, 5);
+		char* addrRecord = (char *)sqlite3_column_text(statement, 6);
+		int domainLen = str_len(domainName1);
+		int addrLen = str_len(addrRecord);//ipµØÖ·ËÄ¸ö×Ö½Ú
+		records[res].NAME = new char[domainLen + 1];
+		memcpy(records[res].NAME, domainName1, domainLen);//¿½±´domainLen¸ö×Ö½Úµ½record-NAME
+		records[res].NAME[domainLen] = '\0';
+		records[res].TYPE = type;
+		records[res].CLASS = cla;
+		records[res].TTL = TTL;
+		records[res].DATALENGTH = dataLen;
+		records[res].RDATA = new char[addrLen + 1];
+		memcpy(records[res].RDATA, addrRecord, addrLen);//¿½±´addrLen¸ö×Ö½Úµ½record-RDATA
+		records[res].RDATA[addrLen] = '\0';
 
-		printf("domainName = %s\nARecord = %s\nTTL = %d\nadress = %s\n\n", domainName1, alias, TTL, address);
+		/*rintf("%s-----------doNameLenth\n",domainName1);
+		printf("%u-----TTL DATALEN-----%u----\n", TTL, dataLen);
+		printf("%s-----A----\n\n", addrRecord);*/
 		res++;
 	}
 	//printf("%d--------query-------\n", res);
@@ -590,7 +914,7 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
 void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *CNAME, int *length)
 {
 	int sqlLength;
-	char temSql[4096] = "INSERT INTO CNAME_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, CNAME) VALUES (";
+	char temSql[SQL_MAX] = "INSERT INTO CNAME_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, CNAME) VALUES (";
 	sqlLength = strlen(temSql);
 	//temSql = temSql + "'" + domainName + "'" + ", " + "'" + ARecord + "'" + ", " + std::to_string(TTL) + ");";
 	connect_string(temSql, "'", sqlLength, 1);
@@ -635,17 +959,18 @@ void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, ch
 
 }
 
-int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
+int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength,  resRecord *record)
 {
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
-	char sql[4096] = "SELECT * from CNAME_RECORD where Name = '";
+	char sql[SQL_MAX] = "SELECT * from CNAME_RECORD where Alias = '";
 	sqlLength = strlen(sql);
-	connect_string(sql, Name, sqlLength, nameLength);
+	connect_string(sql, Alias, sqlLength, nameLength);
 	sqlLength += nameLength;
 	connect_string(sql, "';", sqlLength, 2);
 	sqlite3_prepare(db, sql, -1, &statement, NULL);
+
 	if (ret != SQLITE_OK)
 	{
 		printf("prepare error ret : %d\n", ret);
@@ -654,11 +979,28 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
 	int res = 0;
 	while (sqlite3_step(statement) == SQLITE_ROW)
 	{
-		char* domainName1 = (char *)sqlite3_column_text(statement, 0);
-		char* CNAME_Record = (char *)sqlite3_column_text(statement, 6);
+		char* domainName1 = (char *)sqlite3_column_text(statement, 1);
+		unsigned short type = 5;//×ÊÔ´ÀàĞÍÎªCNAMEÀàĞÍ
+		unsigned short cla = 1;//CLASS×Ö¶ÎÖµÎª1
+		unsigned long TTL = (unsigned long)sqlite3_column_int(statement, 4);
+		unsigned short dataLen = (unsigned short)sqlite3_column_int(statement, 5);
+		char* cnameRecord = (char *)sqlite3_column_text(statement, 6);
+		int domainLen = str_len(domainName1);
+		int cnLen = str_len(cnameRecord);
+		record->NAME = new char[domainLen + 1];
+		memcpy(record->NAME, domainName1, domainLen);//¿½±´N¸ö×Ö½Úµ½record-NAME
+		record->NAME[domainLen] = '\0';
+		record->RDATA = new char[cnLen + 1];
+		memcpy(record->RDATA, cnameRecord, cnLen);//¿½±´N¸ö×Ö½Úµ½record-RDATA
+		record->RDATA[cnLen] = '\0';
+		record->TYPE = type;
+		record->CLASS = cla;
+		record->TTL = TTL;
+		record->DATALENGTH = dataLen;
 
-
-		//printf("domainName = %s\nCNAME = %s\n\n", domainName1, CNAME_Record);
+		//printf("%s------%d-----doNameLenth\n",domainName1);
+		//printf("%u-----TTL DATALEN-----%u----\n", TTL, dataLen);
+		//printf("%s-----CN----\n\n", cnameRecord);
 		res++;
 	}
 	return res;
@@ -669,7 +1011,7 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, c
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
-	char sql[4096] = "SELECT * from CNAME_RECORD where Name = '";
+	char sql[SQL_MAX] = "SELECT * from CNAME_RECORD where Name = '";
 	sqlLength = strlen(sql);
 	connect_string(sql, Name, sqlLength, nameLength);
 	sqlLength += nameLength;

@@ -7,21 +7,17 @@
 
 #pragma comment(lib,"ws2_32.lib")
 
+sqlite3 *db;//sqlite3数据库初始化信息
+SOCKET serverSocket;
 int it_length = 0;//当前存入的ID数目
 int last;//接受数据的长度
 short int old_id_table[IDTABLE_SIZE];//原始ID表
 short int new_id_table[IDTABLE_SIZE];//更改后的ID表
-sqlite3 *db;//sqlite3数据库初始化信息
-
-SOCKET serverSocket;
-
-
 
 void init_database(sqlite3 *db, int rc)
 {
 	char *zErrMsg = 0;
 	//char *sql;
-
 	if (rc)
 	{
 		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
@@ -102,7 +98,7 @@ int main() {
 				header->NSCOUNT = ntohs(header->NSCOUNT);
 				header->ARCOUNT = ntohs(header->ARCOUNT);
 
-				//			printf("\n-----ID:%d FLAGS:%d qcount:%d------\n%d\n", header->ID, header->FLAGS, header->QDCOUNT,last);
+				//printf("\n-----ID:%d FLAGS:%d qcount:%d------\n%d\n", header->ID, header->FLAGS, header->QDCOUNT,last);
 
 
 				if ((header->FLAGS & 0x8000) == 0x8000)//为响应包
