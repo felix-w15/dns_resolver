@@ -15,8 +15,9 @@
 #define QNAME_MAX_LENTH 256
 #define SUPERIOR_SERVER_ADDRESS "10.3.9.5"
 #define SQL_MAX 4096
-#define RESO_MAX 10 //资源最多记录数不超过10
+#define RESO_MAX 1024 //资源最多记录数不超过1024
 #define DOMAIN_LEN_MAX 256//域名最长长度
+
 
 using namespace std;
 
@@ -73,6 +74,7 @@ typedef struct
 	unsigned long TTL;//生存时间
 	unsigned short DATALENGTH;//RDATA字段长度
 	char *RDATA;//资源
+	unsigned short PREFERENCE;//MX记录优先级
 } resRecord;
 
 
@@ -115,6 +117,15 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len);//cn
 void domain_pro(char* name, char *sendBuf, int *bytePos);//域名处理
 void domainStore(char *domain, int len, int iniBytePos, string res);//将域名部分存入字典中
 
+void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *NS, int *length);//插入NS类型记录
+void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, int Preference, char *MX, int *length);//插入MX类型记录
 
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *mName, int mNameLen);
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *NAME_SERVER, int nameServerLen);//查询NS记录
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//查询NS记录的重载
+
+void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
+void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
 #endif // PKG_PRO_H__
 

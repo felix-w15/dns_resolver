@@ -119,7 +119,6 @@ int main() {
 		//cin >> Response; //给客户端回复消息
 		//sendto(sockServer, Response, strlen(Response), 0, (SOCKADDR*)&addr_Clt, sizeof(SOCKADDR));
 	}
-
 	closesocket(serverSocket);
     WSACleanup();
 	sqlite3_close(db);

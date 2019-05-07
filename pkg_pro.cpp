@@ -152,9 +152,7 @@ void domain_pro(char* name, char *sendBuf, int *bytePos)
 		*bytePos = *bytePos + 1;
 
 		sendBuf[*bytePos] = (char)ptrPos;
-		*bytePos = *bytePos + 1;
-		//printf("%d-------------指针", sendBuf[*bytePos]);
-		
+		*bytePos = *bytePos + 1;	
 	}
 	else
 	{
@@ -188,22 +186,22 @@ void a_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
 		*bytePos = *bytePos + 2;
 		insert_IP(records[i].RDATA, sendBuf, bytePos);
 	}
-	//test
-	int t = 0;
-	printf("\n*-*-*-*-*my-*-*-*-*\n");
+	////test
+	//int t = 0;
+	//printf("\n*-*-*-*-*my-*-*-*-*\n");
 
-	while (t < *bytePos)
-	{
-		if (sendBuf[t] >= 65)
-		{
-			printf("%c", sendBuf[t]);
+	//while (t < *bytePos)
+	//{
+	//	if (sendBuf[t] >= 65)
+	//	{
+	//		printf("%c", sendBuf[t]);
 
-		}
-		else
-			printf("%hx-", sendBuf[t]);
-		t++;
-	}
-	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
+	//	}
+	//	else
+	//		printf("%hx-", sendBuf[t]);
+	//	t++;
+	//}
+	//printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
 }
 
 void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
@@ -232,7 +230,7 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
 		cname = newRecord.RDATA;//继续查询下一个CN
 	}
 	//test
-	int t = 0;
+	/*int t = 0;
 	printf("\n*-*-*-*-*my-*-*-*-*\n");
 	while (t < *bytePos)
 	{
@@ -245,7 +243,7 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
 			printf("%hx-", sendBuf[t]);
 		t++;
 	}
-	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
+	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");*/
 }
 
 void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len)//cn_records_pro重载，只执行一次
@@ -272,6 +270,70 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len)//cn_
 	
 }
 
+void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
+{
+	for (int i = 0; i < len; i++)
+	{
+		domain_pro(records[i].NAME, sendBuf, bytePos);//域名处理
+		sendBuf[*bytePos + 1] = (char)(records[i].TYPE);
+		sendBuf[*bytePos + 0] = (records[i].TYPE) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 1] = (char)(records[i].CLASS);
+		sendBuf[*bytePos + 0] = (records[i].CLASS) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 3] = (char)(records[i].TTL);
+		sendBuf[*bytePos + 2] = (char)((records[i].TTL) >> 8);
+		sendBuf[*bytePos + 1] = (char)((records[i].TTL) >> 16);
+		sendBuf[*bytePos + 0] = (records[i].TTL) >> 24;
+		*bytePos = *bytePos + 4;
+		sendBuf[*bytePos + 1] = (char)records[i].DATALENGTH;
+		sendBuf[*bytePos + 0] = records[i].DATALENGTH >> 8;
+		*bytePos = *bytePos + 2;
+		domain_pro(records[i].RDATA, sendBuf, bytePos);
+	}
+	//test
+	/*int t = 0;
+	printf("\n*-*-*-*-*my-*-*-*-*\n");
+
+	while (t < *bytePos)
+	{
+		if (sendBuf[t] >= 65)
+		{
+			printf("%c", sendBuf[t]);
+
+		}
+		else
+			printf("%hx-", sendBuf[t]);
+		t++;
+	}
+	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");*/
+}
+
+void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
+{
+	for (int i = 0; i < len; i++)
+	{
+		domain_pro(records[i].NAME, sendBuf, bytePos);//域名处理
+		sendBuf[*bytePos + 1] = (char)(records[i].TYPE);
+		sendBuf[*bytePos + 0] = (records[i].TYPE) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 1] = (char)(records[i].CLASS);
+		sendBuf[*bytePos + 0] = (records[i].CLASS) >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 3] = (char)(records[i].TTL);
+		sendBuf[*bytePos + 2] = (char)((records[i].TTL) >> 8);
+		sendBuf[*bytePos + 1] = (char)((records[i].TTL) >> 16);
+		sendBuf[*bytePos + 0] = (records[i].TTL) >> 24;
+		*bytePos = *bytePos + 4;
+		sendBuf[*bytePos + 1] = (char)records[i].DATALENGTH;
+		sendBuf[*bytePos + 0] = records[i].DATALENGTH >> 8;
+		*bytePos = *bytePos + 2;
+		sendBuf[*bytePos + 1] = (char)records[i].PREFERENCE;
+		sendBuf[*bytePos + 0] = records[i].PREFERENCE >> 8;
+		*bytePos = *bytePos + 2;
+		domain_pro(records[i].RDATA, sendBuf, bytePos);
+	}
+}
 
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip)
 {
@@ -491,6 +553,80 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 			query_for_superior_server(receiveBuffer, header, cli_ip);//向高一级域名服务器发送查询
 		}
 	}
+	else if (tp == 2)//NS类型查询
+	{
+		resRecord nsRecord[RESO_MAX];//存储NS类型记录
+		int queryNSResult = query_NS_record(db, zErrMsg, doName, str_len(doName), nsRecord);
+		if (queryNSResult)
+		{
+			header->ID = htons(header->ID);
+			memcpy(sendBuf, receiveBuffer, last);//拷贝N个字节到发送缓冲区
+
+			//将QNAME存入字典
+			domainStore(QNAME, str_len(QNAME), 12, "");//12为QNAME开始字节数
+			//printf("%s/*/*/*/%d*/*/*/\n", QNAME, str_len(QNAME));
+
+			unsigned short Flags = 0x8180;
+			unsigned short Questions = (unsigned short)1;
+			unsigned short Answer = (unsigned short)(queryNSResult);
+			//printf("/*/*/*/%c*/*answer/*/\n", Answer);
+			//printf("/*/*/*/%u*/*/answer*/\n", Answer);
+			*(sendBuf + 3) = (char)Flags;
+			*(sendBuf + 2) = Flags >> 8;
+			*(sendBuf + 5) = (char)Questions;
+			*(sendBuf + 4) = Questions >> 8;
+			*(sendBuf + 7) = (char)Answer;
+			*(sendBuf + 6) = Answer >> 8;
+			//printf("/*/*/*/%d/*%d/*/\n", sendBuf[6], sendBuf[7]);
+
+			//cn_records_pro(*cnameRecord, sendBuf, &bytePos);//cname记录处理成dns包数据流形式并存入发送缓冲区
+
+			ns_records_pro(nsRecord, queryNSResult, sendBuf, &bytePos);
+
+			printf("本地存有%s域名的NS类型记录!\n\n", doName);
+			//转发给客户机
+			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
+		}
+		else
+			query_for_superior_server(receiveBuffer, header, cli_ip);//向高一级域名服务器发送查询
+	}
+	else if (tp == 15)//MX类型查询
+	{
+		resRecord mxRecord[RESO_MAX];//存储NS类型记录
+		int queryMXResult = query_MX_record(db, zErrMsg, doName, str_len(doName), mxRecord);
+		if (queryMXResult)
+		{
+			header->ID = htons(header->ID);
+			memcpy(sendBuf, receiveBuffer, last);//拷贝N个字节到发送缓冲区
+
+			//将QNAME存入字典
+			domainStore(QNAME, str_len(QNAME), 12, "");//12为QNAME开始字节数
+			//printf("%s/*/*/*/%d*/*/*/\n", QNAME, str_len(QNAME));
+
+			unsigned short Flags = 0x8180;
+			unsigned short Questions = (unsigned short)1;
+			unsigned short Answer = (unsigned short)(queryMXResult);
+			//printf("/*/*/*/%c*/*answer/*/\n", Answer);
+			//printf("/*/*/*/%u*/*/answer*/\n", Answer);
+			*(sendBuf + 3) = (char)Flags;
+			*(sendBuf + 2) = Flags >> 8;
+			*(sendBuf + 5) = (char)Questions;
+			*(sendBuf + 4) = Questions >> 8;
+			*(sendBuf + 7) = (char)Answer;
+			*(sendBuf + 6) = Answer >> 8;
+			//printf("/*/*/*/%d/*%d/*/\n", sendBuf[6], sendBuf[7]);
+
+			//cn_records_pro(*cnameRecord, sendBuf, &bytePos);//cname记录处理成dns包数据流形式并存入发送缓冲区
+
+			mx_records_pro(mxRecord, queryMXResult, sendBuf, &bytePos);
+
+			printf("本地存有%s域名的NS类型记录!\n\n", doName);
+			//转发给客户机
+			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
+		}
+		else
+			query_for_superior_server(receiveBuffer, header, cli_ip);//向高一级域名服务器发送查询
+	}
 	else
 	  query_for_superior_server(receiveBuffer, header, cli_ip);//向高一级域名服务器发送查询
 }
@@ -632,7 +768,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			int ttlLen = (std::to_string(TTL)).length();
 			int doNameLen = str_len(doName);
 			int aliasLen = str_len(doname);
-			int lenth[7];//各项资源长度数据	
+			int lenth[RESO_MAX];//各项资源长度数据	
 
 			lenth[0] = doNameLen;//域名长度
 			lenth[1] = aliasLen;//别名长度
@@ -666,9 +802,21 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			}
 			else if (*type == 2)
 			{//NS类型
+				lenth[2] = 2;//type类型长度为2
+				storeData[0] = 'N';
+				storeData[1] = 'S';
+				storeData[2] = 'I';
+				storeData[3] = 'N';
+
 				char dname[QNAME_MAX_LENTH];//存储域名服务器的名字
 				length = do_name_reso(0, 0, c_byte, dname, receiveBuffer);//解析域名服务器的名字
+				
+ 				lenth[5] = (std::to_string(length)).length();
+				lenth[6] = str_len(dname);
+				printf("    name_len：%d\n\n", length);
 				printf("    name server：%s\n\n", dname);
+				if (!query_NS_record(db, zErrMsg, doName, doNameLen, dname, lenth[6]))//如果数据库中无该NS记录则存储
+					insert_NS_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length, dname, lenth);
 			}
 			else if (*type == 5)
 			{//CNAME类型
@@ -688,13 +836,25 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			}
 			else if (*type == 15)
 			{//MX类型
+				lenth[2] = 2;//type类型长度为2
+				storeData[0] = 'M';
+				storeData[1] = 'X';
+				storeData[2] = 'I';
+				storeData[3] = 'N';
+
+
 				char mname[QNAME_MAX_LENTH];//存储邮件服务器名
 				unsigned short *preference;//邮件服务器的优先级
 				preference = (unsigned short*)(receiveBuffer + c_byte);
 				length = do_name_reso(0, 0, c_byte + 2, mname, receiveBuffer);//解析邮件服务器名
 				*preference = ntohs(*preference);
+				lenth[5] = (std::to_string(length)).length();
+				lenth[6] = (std::to_string((int)*preference)).length();
+				lenth[7] = str_len(mname);
 				printf("    preference：%d\n", *preference);
 				printf("    mail exchange：%s\n\n", mname);
+				if (!query_MX_record(db, zErrMsg, doName, doNameLen, mname, lenth[7]))//判断数据库中是否有MX记录
+					insert_MX_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length + lenth[6], (int)*preference, mname, lenth);
 				*preference = htons(*preference);
 			}
 			c_byte += *relength;
@@ -722,11 +882,9 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 	int length = clength;//记录域名占用长度
 	int alength = addlength;//记录加入点的长度
 	int cu_byte = c_byte;
-	//printf("当前字节数：%d\n", cu_byte);
 	unsigned char  c;
 
 	c = receivebuffer[cu_byte];//取第一块域名的字节数
-	//printf("当前域名字节数：%d\n", c);
 	while (c != 0)
 	{//未到域名结束符
 		if ((c & 0xc0) == 0xc0)
@@ -744,16 +902,13 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 		{
 			cu_byte++;
 			length++;
-			//printf("当前字节数：%d\n", cu_byte);
 			int le = c;//转化为整数
-			//printf("当前域名字节数：%d\n", le);
 			for (int i = 0; i < le; i++)
 			{
 				doname[alength++] = receivebuffer[cu_byte++];
 				length++;
 			}
 			c = receivebuffer[cu_byte];//取下一块域名的字节数
-			//printf("当前域名字节数：%d\n", c);
 			if (c != 0)  doname[alength++] = '.';
 		}
 	}
@@ -819,8 +974,6 @@ void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *
 	connect_string(temSql, Address, sqlLength, length[6]);
 	sqlLength += length[6];
 	connect_string(temSql, "');", sqlLength, 3);
-	//printf("%s", temSql);
-	//return;
 	int rc = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
 	if (rc != SQLITE_OK) {
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -855,10 +1008,6 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const
 	int res = 0;
 	while (sqlite3_step(statement) == SQLITE_ROW)
 	{
-		char* domainName1 = (char *)sqlite3_column_text(statement, 0);
-		char* ARecord = (char *)sqlite3_column_text(statement, 6);
-
-		printf("domainName = %s\nARecord = %s\n\n", domainName1, ARecord);
 		res++;
 	}
 	return res;
@@ -902,12 +1051,8 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRe
 		memcpy(records[res].RDATA, addrRecord, addrLen);//拷贝addrLen个字节到record-RDATA
 		records[res].RDATA[addrLen] = '\0';
 
-		/*rintf("%s-----------doNameLenth\n",domainName1);
-		printf("%u-----TTL DATALEN-----%u----\n", TTL, dataLen);
-		printf("%s-----A----\n\n", addrRecord);*/
 		res++;
 	}
-	//printf("%d--------query-------\n", res);
 	return res;
 }
 
@@ -946,7 +1091,6 @@ void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, ch
 	connect_string(temSql, CNAME, sqlLength, length[6]);
 	sqlLength += length[6];
 	connect_string(temSql, "');", sqlLength, 3);
-	//printf("%s", temSql);
 	//return;
 	int rc = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
 	if (rc != SQLITE_OK) {
@@ -997,10 +1141,6 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength, 
 		record->CLASS = cla;
 		record->TTL = TTL;
 		record->DATALENGTH = dataLen;
-
-		//printf("%s------%d-----doNameLenth\n",domainName1);
-		//printf("%u-----TTL DATALEN-----%u----\n", TTL, dataLen);
-		//printf("%s-----CN----\n\n", cnameRecord);
 		res++;
 	}
 	return res;
@@ -1033,6 +1173,250 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, c
 		char* CNAME_Record = (char *)sqlite3_column_text(statement, 6);
 
 		printf("domainName = %s\nCNAME = %s\n\n", domainName1, CNAME_Record);
+		res++;
+	}
+	return res;
+}
+
+void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, int Preference, char *MX, int *length)
+{
+	int sqlLength;
+	char temSql[SQL_MAX] = "INSERT INTO MX_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Preference, Mail_Exchange) VALUES (";
+	sqlLength = strlen(temSql);
+	//temSql = temSql + "'" + domainName + "'" + ", " + "'" + ARecord + "'" + ", " + std::to_string(TTL) + ");";
+	connect_string(temSql, "'", sqlLength, 1);
+	sqlLength += 1;
+	connect_string(temSql, Name, sqlLength, length[0]);
+	sqlLength += length[0];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Alias, sqlLength, length[1]);
+	sqlLength += length[1];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Type, sqlLength, length[2]);
+	sqlLength += length[2];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Class, sqlLength, length[3]);
+	sqlLength += length[3];
+	connect_string(temSql, "', ", sqlLength, 3);
+	sqlLength += 3;
+	connect_string(temSql, std::to_string(TTL).c_str(), sqlLength, length[4]);
+	sqlLength += length[4];
+	connect_string(temSql, ", ", sqlLength, 2);
+	sqlLength += 2;
+	connect_string(temSql, std::to_string(DataLength).c_str(), sqlLength, length[5]);
+	sqlLength += length[5];
+	connect_string(temSql, ", ", sqlLength, 2);
+	sqlLength += 2;
+	connect_string(temSql, std::to_string(Preference).c_str(), sqlLength, length[6]);
+	sqlLength += length[6];
+	connect_string(temSql, ", '", sqlLength, 3);
+	sqlLength += 3;
+	connect_string(temSql, MX, sqlLength, length[7]);
+	sqlLength += length[7];
+	connect_string(temSql, "');", sqlLength, 3);
+	int rc = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	else {
+		fprintf(stdout, "Operation done successfully\n");
+	}
+
+}
+
+void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *NS, int *length)
+{
+	int sqlLength;
+	char temSql[SQL_MAX] = "INSERT INTO NS_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Name_Server) VALUES (";
+	sqlLength = strlen(temSql);
+	//temSql = temSql + "'" + domainName + "'" + ", " + "'" + ARecord + "'" + ", " + std::to_string(TTL) + ");";
+	connect_string(temSql, "'", sqlLength, 1);
+	sqlLength += 1;
+	connect_string(temSql, Name, sqlLength, length[0]);
+	sqlLength += length[0];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Alias, sqlLength, length[1]);
+	sqlLength += length[1];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Type, sqlLength, length[2]);
+	sqlLength += length[2];
+	connect_string(temSql, "', '", sqlLength, 4);
+	sqlLength += 4;
+	connect_string(temSql, Class, sqlLength, length[3]);
+	sqlLength += length[3];
+	connect_string(temSql, "', ", sqlLength, 3);
+	sqlLength += 3;
+	connect_string(temSql, std::to_string(TTL).c_str(), sqlLength, length[4]);
+	sqlLength += length[4];
+	connect_string(temSql, ", ", sqlLength, 2);
+	sqlLength += 2;
+	connect_string(temSql, std::to_string(DataLength).c_str(), sqlLength, length[5]);
+	sqlLength += length[5];
+	connect_string(temSql, ", '", sqlLength, 3);
+	sqlLength += 3;
+	connect_string(temSql, NS, sqlLength, length[6]);
+	sqlLength += length[6];
+	connect_string(temSql, "');", sqlLength, 3);
+	int rc = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	else {
+		fprintf(stdout, "Operation done successfully\n");
+	}
+
+}
+
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
+{
+	int ret = 0;
+	sqlite3_stmt *statement;
+	int sqlLength;
+	char sql[SQL_MAX] = "SELECT * from MX_RECORD where Name = '";
+	sqlLength = strlen(sql);
+	connect_string(sql, Name, sqlLength, nameLength);
+	sqlLength += nameLength;
+	
+
+	connect_string(sql, "';", sqlLength, 2);
+	sqlite3_prepare(db, sql, -1, &statement, NULL);
+	if (ret != SQLITE_OK)
+	{
+		printf("prepare error ret : %d\n", ret);
+		return 0;
+	}
+	int res = 0;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		char* domainName1 = (char *)sqlite3_column_text(statement, 1);
+		unsigned short type = 15;//资源类型为NS类型
+		unsigned short cla = 1;//CLASS字段值为1
+		unsigned long TTL = (unsigned long)sqlite3_column_int(statement, 4);
+		unsigned short dataLen = (unsigned short)sqlite3_column_int(statement, 5);
+		unsigned short preference = (unsigned short)sqlite3_column_int(statement, 6);
+		char* mxServer = (char *)sqlite3_column_text(statement, 7);
+		int domainLen = str_len(domainName1);
+		int mxServerLen = str_len(mxServer);//NS记录的长度
+		records[res].NAME = new char[domainLen + 1];
+		memcpy(records[res].NAME, domainName1, domainLen);//拷贝domainLen个字节到record-NAME
+		records[res].NAME[domainLen] = '\0';
+		records[res].TYPE = type;
+		records[res].CLASS = cla;
+		records[res].TTL = TTL;
+		records[res].DATALENGTH = dataLen;
+		records[res].RDATA = new char[mxServerLen + 1];
+		memcpy(records[res].RDATA, mxServer, mxServerLen);//拷贝addrLen个字节到record-RDATA
+		records[res].RDATA[mxServerLen] = '\0';
+		records[res].PREFERENCE = preference;
+
+		res++;
+	}
+	return res;
+}
+
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *mName, int mNameLen)
+{
+	int ret = 0;
+	sqlite3_stmt *statement;
+	int sqlLength;
+	char sql[SQL_MAX] = "SELECT * from MX_RECORD where Name = '";
+	sqlLength = strlen(sql);
+	connect_string(sql, Name, sqlLength, nameLength);
+	sqlLength += nameLength;
+	connect_string(sql, "' and Mail_Exchange = '", sqlLength, 23);
+	sqlLength += 23;
+	connect_string(sql, mName, sqlLength, mNameLen);
+	sqlLength += mNameLen;
+
+	connect_string(sql, "';", sqlLength, 2);
+	sqlite3_prepare(db, sql, -1, &statement, NULL);
+	if (ret != SQLITE_OK)
+	{
+		printf("prepare error ret : %d\n", ret);
+		return 0;
+	}
+	int res = 0;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		res++;
+	}
+	return res;
+}
+
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *NAME_SERVER, int nameServerLen)
+{
+	int ret = 0;
+	sqlite3_stmt *statement;
+	int sqlLength;
+	char sql[SQL_MAX] = "SELECT * from NS_RECORD where Name = '";
+	sqlLength = strlen(sql);
+	connect_string(sql, Name, sqlLength, nameLength);
+	sqlLength += nameLength;
+	connect_string(sql, "' and NAME_SERVER = '", sqlLength, 21);
+	sqlLength += 21;
+	connect_string(sql, NAME_SERVER, sqlLength, nameServerLen);
+	sqlLength += nameServerLen;
+	connect_string(sql, "';", sqlLength, 2);
+	sqlite3_prepare(db, sql, -1, &statement, NULL);
+	if (ret != SQLITE_OK)
+	{
+		printf("prepare error ret : %d\n", ret);
+		return 0;
+	}
+	int res = 0;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		res++;
+	}
+	return res;
+}
+
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
+{
+	int ret = 0;
+	sqlite3_stmt *statement;
+	int sqlLength;
+	char sql[SQL_MAX] = "SELECT * from NS_RECORD where Name = '";
+	sqlLength = strlen(sql);
+	connect_string(sql, Name, sqlLength, nameLength);
+	sqlLength += nameLength;
+	connect_string(sql, "';", sqlLength, 2);
+	sqlite3_prepare(db, sql, -1, &statement, NULL);
+	if (ret != SQLITE_OK)
+	{
+		printf("prepare error ret : %d\n", ret);
+		return 0;
+	}
+	int res = 0;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		//char* domainName1 = (char *)sqlite3_column_text(statement, 0);
+		//char* NameServer = (char *)sqlite3_column_text(statement, 6);
+		char* domainName1 = (char *)sqlite3_column_text(statement, 1);
+		unsigned short type = 2;//资源类型为NS类型
+		unsigned short cla = 1;//CLASS字段值为1
+		unsigned long TTL = (unsigned long)sqlite3_column_int(statement, 4);
+		unsigned short dataLen = (unsigned short)sqlite3_column_int(statement, 5);
+		char* nameServer = (char *)sqlite3_column_text(statement, 6);
+		int domainLen = str_len(domainName1);
+		int nameServerLen = str_len(nameServer);//NS记录的长度
+		records[res].NAME = new char[domainLen + 1];
+		memcpy(records[res].NAME, domainName1, domainLen);//拷贝domainLen个字节到record-NAME
+		records[res].NAME[domainLen] = '\0';
+		records[res].TYPE = type;
+		records[res].CLASS = cla;
+		records[res].TTL = TTL;
+		records[res].DATALENGTH = dataLen;
+		records[res].RDATA = new char[nameServerLen + 1];
+		memcpy(records[res].RDATA, nameServer, nameServerLen);//拷贝addrLen个字节到record-RDATA
+		records[res].RDATA[nameServerLen] = '\0';
 		res++;
 	}
 	return res;
