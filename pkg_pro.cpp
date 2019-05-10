@@ -4,10 +4,9 @@
 
 #include"pkg_pro.h"
 
-stringstream sstream;
-
+long timestamp[IDTABLE_SIZE];//存放向上级请求包发出时间
 SOCKADDR_IN client_ip[IDTABLE_SIZE];//存放客户机的ip地址，用以发答复包以及并发处理
-
+stringstream sstream;
 map<string, unsigned short> *mapDomainName;
 
 
@@ -338,28 +337,31 @@ void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip)
 {
 	//转换DNS数据包头ID,存客户机ip地址
+	long current_time = GetTickCount();//记录下接收到包的时间
 	int k = 0;//判断是否有相同ID
-	short int hid = header->ID;
+	short int hid = header->ID;//取ID字段
 	short int nhid;//更改后的ID
 	for (int i = 0; i < it_length; i++)
 	{
-		if (hid == new_id_table[i]) {
+		if (hid == new_id_table[i]) {//已有相同ID
 			k = 1;
 			break;
 		}
 	}
+	int i = 0;
 	if (k == 0) {//没有相同的ID
 		nhid = hid;//不用更改ID
-		int i = 0;
 		for (i = 0; i < it_length; i++)
 		{
-			if (nhid < new_id_table[i]) {//将新ID插入更改后的表
+			if (nhid < new_id_table[i]) {//将ID插入更改后的表
 				for (int j = it_length; j > i; j--)
-				{//后移
+				{//大于此ID的包信息后移
 					new_id_table[j] = new_id_table[j - 1];
 					old_id_table[j] = old_id_table[j - 1];
 					client_ip[j] = client_ip[j - 1];
+					timestamp[j] = timestamp[j - 1];
 				}
+				//给新的向上级的请求包存储信息
 				old_id_table[i] = hid;
 				new_id_table[i] = nhid;
 				client_ip[i] = cli_ip;
@@ -370,7 +372,7 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 		if (i == it_length)
 		{//若新表中所有ID都小于此ID
 			old_id_table[i] = hid;
-			new_id_table[it_length] = nhid;
+			new_id_table[i] = nhid;
 			client_ip[i] = cli_ip;
 			it_length++;
 		}
@@ -380,15 +382,17 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 		nhid = 0;//从0开始构造ID
 		int i = 0;
 		for (int i = 0; i < it_length; i++)
-		{
-			if (nhid == new_id_table[i])  nhid++;//构造的ID已被使用
-			else {//构造的ID未被使用，由于是有序的，故直接在此插入
+		{//找一个未被使用的ID或可被替换的ID
+			if ((nhid == new_id_table[i]) && (current_time - timestamp[i] <= 50000))  nhid++;//构造的ID已被使用
+			else {//构造的ID未被使用或超时时间过长可被替换，由于是有序的，故直接在此插入
 				for (int j = it_length; j > i; j--)
 				{//后移
 					new_id_table[j] = new_id_table[j - 1];
 					old_id_table[j] = old_id_table[j - 1];
 					client_ip[j] = client_ip[j - 1];
+					timestamp[j] = timestamp[j - 1];
 				}
+				//存储当前包信息
 				old_id_table[i] = hid;
 				new_id_table[i] = nhid;
 				client_ip[i] = cli_ip;
@@ -405,7 +409,7 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 		}
 	}
 	header->ID = nhid;//将新ID字段赋给包头
-	header->ID = htons(header->ID);
+	header->ID = htons(header->ID);//转换字节序
 	
 	
 
@@ -416,11 +420,20 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 	to_address.sin_addr.S_un.S_addr = inet_addr(SUPERIOR_SERVER_ADDRESS);
 	if (sendto(serverSocket, receiveBuffer, last, 0, (const struct sockaddr *)&to_address, addr_len))
 	{
+		timestamp[i] = GetTickCount();//记录发出包的时间
 		printf("转发至上一级域名服务器成功！\n");
 	}
 	else
 	{
 		printf("转发至上一级域名服务器失败！\n");
+		for (int j = i; j < IDTABLE_SIZE; i++)
+		{//更改后的信息删除
+			new_id_table[j] = new_id_table[j + 1];
+			old_id_table[j] = old_id_table[j + 1];
+			client_ip[j] = client_ip[j + 1];
+			timestamp[j] = timestamp[j + 1];
+		}
+		it_length--;
 	}
 }
 
@@ -633,6 +646,10 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 
 void resp_pro(dns_header *header, char *receiveBuffer)
 {
+	SOCKADDR_IN q_ip;//此包应回复给的客户机ip
+	long ctime = GetTickCount();//记录当前接收到包的时间
+	int time_out = 0;//记录是否是超时包
+
 	int t = 0;
 	printf("\n*-*-*-*-recieve*-*-*-*-*\n");
 	while (t < last)
@@ -648,35 +665,49 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 	}
 	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");
 
-	//还原DNS数据包头ID
-	SOCKADDR_IN q_ip;//此包应回复给的客户机ip
-	short int hid = header->ID;
-	short int rehid;//还原后后的ID
-	int i = 0;
-	for (i = 0; i < it_length; i++)
-	{//找到ID在新表中对应的下标
-		if (hid == new_id_table[i])  break;
-	}
-	rehid = old_id_table[i];//取原始ID
-	q_ip = client_ip[i];
-
-	for (int j = i; j < it_length - 1; j++)
-	{//删除此ID数据，后面ID数据前移
-		old_id_table[i] = old_id_table[i + 1];
-		new_id_table[i] = new_id_table[i + 1];
-		client_ip[i] = client_ip[i + 1];
-	}
-	it_length--;//长度减1
-	header->ID = rehid;//还原ID
 
 	//取应答内容，插入数据库
-
 	//取AA
 	if ((header->FLAGS & 0x0400) == 0x0400) {//答案来授权域名解析服务器（在此为本地服务器）
 		printf("答案来自本地服务器\n");
 	}
 	else {
 		printf("答案来自上级服务器\n");
+		//还原DNS数据包头ID
+		short int hid = header->ID;//取包中ID
+		short int rehid;//存储还原后后的ID
+		int i = 0;
+		for (i = 0; i < it_length; i++)
+		{//找到ID在新表中对应的下标
+			if (hid == new_id_table[i])  break;
+		}
+		if (i == it_length)
+		{//为迟到包且ID已被替换过
+			time_out = 1;
+		}
+		else if (ctime - timestamp[i] > 2000)
+		{//为迟到包且ID未被替换
+			time_out = 1;
+			for (int j = i; j < it_length - 1; j++)
+			{//删除此ID数据，后面ID数据前移
+				old_id_table[i] = old_id_table[i + 1];
+				new_id_table[i] = new_id_table[i + 1];
+				client_ip[i] = client_ip[i + 1];
+			}
+			it_length--;//长度减1
+		}
+		else {//非超时包
+			rehid = old_id_table[i];//取原始ID
+			q_ip = client_ip[i];
+			for (int j = i; j < it_length - 1; j++)
+			{//删除此ID数据，后面ID数据前移
+				old_id_table[i] = old_id_table[i + 1];
+				new_id_table[i] = new_id_table[i + 1];
+				client_ip[i] = client_ip[i + 1];
+			}
+			it_length--;//长度减1
+			header->ID = rehid;//还原ID
+		}
 	}
 
 	//判断RCODE
@@ -693,7 +724,6 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 		int reso = requ + aure + adre;//总的资源记录个数
 
 		int c_byte = sizeof(dns_header);//当前拆分到的字节位置
-//		printf("请求和资源记录个数%d   %d\n", ques, reso);
 		//拆分Question Section部分
 
 		
@@ -711,16 +741,17 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 
 			length = do_name_reso(0, 0, c_byte, doName, receiveBuffer);//解析域名或邮件地址后缀名
 			c_byte += length;
-			type = (unsigned short*)(receiveBuffer + c_byte);
+			type = (unsigned short*)(receiveBuffer + c_byte);//取查询类型
 			c_byte += 2;
-			Class = (unsigned short*)(receiveBuffer + c_byte);
+			Class = (unsigned short*)(receiveBuffer + c_byte);//取Class
 			c_byte += 2;
 
 			*type = ntohs(*type);
 			*Class = ntohs(*Class);
-			printf("    qname：%s\n", doName);
-			printf("    qtype：%d\n", *type);
-			printf("    qclass：%d\n\n", *Class);
+			//输出查询问题信息
+			printf("    QName：%s\n", doName);
+			printf("    QType：%d\n", *type);
+			printf("    QClass：%d\n\n", *Class);
 			*type = htons(*type);
 			*Class = htons(*Class);
 		}
@@ -728,6 +759,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 		//拆分后三段资源记录部分，因为格式相同，故同时解析
 		for (int i = 0; i < reso; i++)
 		{
+			//当解析到某种字段时，输出提示信息
 			if (i == 0)  printf("Anwser Section（%d个）：\n\n", requ);
 			if (i == requ)  printf("Authority Records Section（%d个）：\n\n", aure);
 			if (i == requ + aure)  printf("Additional Records Section（%d个）：\n\n", adre);
@@ -739,8 +771,8 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			unsigned long *ttl;//生存时间
 			unsigned short *relength;//资源数据长度
 
+			//取公共字段
 			length = do_name_reso(0, 0, c_byte, doname, receiveBuffer);//解析域名或邮件地址后缀名
-			//printf("域名长度%d\n", *relength);
 			c_byte += length;
 			type = (unsigned short*)(receiveBuffer + c_byte);
 			c_byte += 2;
@@ -751,15 +783,15 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			relength = (unsigned short*)(receiveBuffer + c_byte);
 			c_byte += 2;
 
+			//输出公共字段信息
 			*type = ntohs(*type);
 			*Class = ntohs(*Class);
 			*ttl = ntohl(*ttl);
 			*relength = ntohs(*relength);
-			printf("    name：%s\n", doname);
-			printf("    type：%d\n", *type);
-			printf("    class：%d\n", *Class);
-			printf("    time to live：%ld\n", *ttl);
-			//printf("    dataLenth: %d\n", *relength);
+			printf("    Name：%s\n", doname);
+			printf("    Type：%d\n", *type);
+			printf("    Class：%d\n", *Class);
+			printf("    TTL：%ld\n", *ttl);
 
 			char storeData[BUFFER_SIZE];
 			char *zErrMsg = 0;
@@ -775,8 +807,8 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			lenth[3] = 2;//class长度
 			lenth[4] = ttlLen;
 
-			printf("    dataLenth: %d\n", doNameLen);
-			printf("    TTL:%d\n", TTL);
+//			printf("    DataLenth: %d\n", doNameLen);
+//			printf("    TTL:%d\n", TTL);
 			if (*type == 1)
 			{//IP地址类型
 				unsigned char ip_address[4];
@@ -788,7 +820,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				storeData[6] = ip_address[2] = receiveBuffer[c_byte + 2];
 				storeData[7] = ip_address[3] = receiveBuffer[c_byte + 3];
 				storeData[8] = '\0';
-				printf("    ip：%d.%d.%d.%d\n\n", ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+				printf("    IP：%d.%d.%d.%d\n\n", ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
 				
 				string ip = translate_IP(ip_address);	
 				int ipLen = ip.length();//ip地址长度
@@ -813,8 +845,8 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				
  				lenth[5] = (std::to_string(length)).length();
 				lenth[6] = str_len(dname);
-				printf("    name_len：%d\n\n", length);
-				printf("    name server：%s\n\n", dname);
+				printf("    Name Length：%d\n\n", length);
+				printf("    Name Server：%s\n\n", dname);
 				if (!query_NS_record(db, zErrMsg, doName, doNameLen, dname, lenth[6]))//如果数据库中无该NS记录则存储
 					insert_NS_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length, dname, lenth);
 			}
@@ -832,7 +864,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				lenth[6] = str_len(cname);
 				if(!query_CNAME_record(db, zErrMsg, doName, doNameLen, cname, lenth[6]))//如果数据库中无该CN记录则存储
 				  insert_CNAME_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length, cname, lenth);
-				printf("    cname：%s\n\n", cname);
+				printf("    CName：%s\n\n", cname);
 			}
 			else if (*type == 15)
 			{//MX类型
@@ -851,14 +883,15 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				lenth[5] = (std::to_string(length)).length();
 				lenth[6] = (std::to_string((int)*preference)).length();
 				lenth[7] = str_len(mname);
-				printf("    preference：%d\n", *preference);
-				printf("    mail exchange：%s\n\n", mname);
+				printf("    Preference：%d\n", *preference);
+				printf("    Mail Exchange：%s\n\n", mname);
 				if (!query_MX_record(db, zErrMsg, doName, doNameLen, mname, lenth[7]))//判断数据库中是否有MX记录
 					insert_MX_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length + lenth[6], (int)*preference, mname, lenth);
 				*preference = htons(*preference);
 			}
-			c_byte += *relength;
+			c_byte += *relength;//解析到的字节数更新
 
+			//转换字节序
 			*type = htons(*type);
 			*Class = htons(*Class);
 			*ttl = htonl(*ttl);
@@ -866,6 +899,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 		}
 	}
 
+	//转换字节序
 	header->ID = htons(header->ID);
 	header->FLAGS = htons(header->FLAGS);
 	header->QDCOUNT = htons(header->QDCOUNT);
@@ -874,8 +908,11 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 	header->ARCOUNT = htons(header->ARCOUNT);
 
 	//转发给客户机
-	sendto(serverSocket, receiveBuffer, last, 0, (SOCKADDR*)&q_ip, sizeof(SOCKADDR));
+	if (time_out == 0) {//不是超时包
+		sendto(serverSocket, receiveBuffer, last, 0, (SOCKADDR*)&q_ip, sizeof(SOCKADDR));
+	}
 }
+
 
 int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *receivebuffer)
 {
@@ -888,23 +925,24 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 	while (c != 0)
 	{//未到域名结束符
 		if ((c & 0xc0) == 0xc0)
-		{
+		{//解析到指针，已到末尾，固定占用2字节长度
 			unsigned short *x = (unsigned short *)(receivebuffer + cu_byte);
 			*x = ntohs(*x);//转化为主机字节序
 			*x = (*x) & 0x3fff;//前两bit置零
 			int offset = *x;
-			int k = do_name_reso(length, alength, offset, doname, receivebuffer);//递归解析域名，不增加占用长度
+			int k = do_name_reso(length, alength, offset, doname, receivebuffer);//递归解析并存储域名，不增加占用长度
 			*x = (*x) | 0xc000;//前两bit复原
 			*x = htons(*x);//还原为网络字节序
-			return length + 2;
+			return length + 2;//指针说明域名存储已到末尾，返回占用长度
 		}
 		else
-		{
+		{//不是指针
 			cu_byte++;
 			length++;
 			int le = c;//转化为整数
 			for (int i = 0; i < le; i++)
 			{
+				//存储此块域名
 				doname[alength++] = receivebuffer[cu_byte++];
 				length++;
 			}
@@ -915,8 +953,7 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 	cu_byte++;
 	length++;//域名结束符也算在占用长度里
 	doname[alength] = '\0';
-	return length;
-
+	return length;//返回域名占用长度
 }
 
 void connect_string(char *a, char *b, int aLength, int bLength)
@@ -1172,7 +1209,7 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, c
 		char* domainName1 = (char *)sqlite3_column_text(statement, 0);
 		char* CNAME_Record = (char *)sqlite3_column_text(statement, 6);
 
-		printf("domainName = %s\nCNAME = %s\n\n", domainName1, CNAME_Record);
+//		printf("domainName = %s\nCNAME = %s\n\n", domainName1, CNAME_Record);
 		res++;
 	}
 	return res;

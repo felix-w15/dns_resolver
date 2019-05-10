@@ -6,6 +6,7 @@
 #include<iostream>
 #include<map>
 #include<sstream>
+#include<time.h>
 
 #include"sqlite3.h"
 
@@ -77,12 +78,12 @@ typedef struct
 	unsigned short PREFERENCE;//MX记录优先级
 } resRecord;
 
-
 extern int it_length;//当前存入的ID数目
 extern int last;//接受数据的长度
-extern short int old_id_table[IDTABLE_SIZE];//原始ID表
-extern short int new_id_table[IDTABLE_SIZE];//更改后的ID表
+extern long timestamp[IDTABLE_SIZE];//存放向上级请求包发出时间
 extern SOCKADDR_IN client_ip[IDTABLE_SIZE];//存放客户机的ip地址，用以发答复包以及并发处理
+extern short int old_id_table[IDTABLE_SIZE];//原始ID表
+extern short int new_id_table[IDTABLE_SIZE];//更改后的ID表，按ID从小到大的顺序存储
 extern sqlite3 *db;//sqlite3数据库初始化信息
 extern map<string, unsigned short> *mapDomainName;
 
