@@ -29,6 +29,7 @@ void init_database(sqlite3 *db, int rc)
 }
 
 int main() {
+
 	WSADATA WSAData;//windows socket初始化信息
 	char receiveBuffer[BUFFER_SIZE];
 	int rc;
@@ -124,4 +125,3 @@ int main() {
 	sqlite3_close(db);
 	return 0;
 }
-
