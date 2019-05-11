@@ -81,14 +81,6 @@ int main() {
 			}
 			else
 			{
-				//printf("接收到数据（%s）：%s\n", inet_ntoa(addr_Clt.sin_addr), receBuf);
-				//printf("接收到数据（%s）\n", inet_ntoa(addr_Clt.sin_addr));				
-	            /*			
-	            for (int i = 0; i < last; i++)
-				{
-					printf("%c ", receiveBuffer[i]);
-				}
-                */
                 //创建header
 				dns_header *header;
 				header = (dns_header *)receiveBuffer;
@@ -104,21 +96,18 @@ int main() {
 
 				if ((header->FLAGS & 0x8000) == 0x8000)//为响应包
 				{
-					printf("\n\n-------Response Package-------\n");
+					//printf("\n\n-------Response Package-------\n");
 					resp_pro(header, receiveBuffer);
 				}
 				else//请求包
 				{
-					printf("\n\n-------Query Package-------\n");
+					//printf("\n\n-------Query Package-------\n");
 					query_pro(header, receiveBuffer, addr_Clt);//请求处理
 				}
 
 
 			}
 		}
-		//cout << "回复客户端消息:";
-		//cin >> Response; //给客户端回复消息
-		//sendto(sockServer, Response, strlen(Response), 0, (SOCKADDR*)&addr_Clt, sizeof(SOCKADDR));
 	}
 	closesocket(serverSocket);
     WSACleanup();
