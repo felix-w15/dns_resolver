@@ -1,13 +1,15 @@
 #include<stdlib.h>
 #include<stdio.h>
-
+#include<mutex>
 
 #include"pkg_pro.h"
 
 long timestamp[IDTABLE_SIZE];//存放向上级请求包发出时间
 SOCKADDR_IN client_ip[IDTABLE_SIZE];//存放客户机的ip地址，用以发答复包以及并发处理
-stringstream sstream;
-map<string, unsigned short> *mapDomainName;
+stringstream sstream;//转换格式流
+map<string, unsigned short> *mapDomainName;//
+
+std::mutex mt;//互斥器
 
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
@@ -305,14 +307,14 @@ void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip)
 {
 	//转换DNS数据包头ID,存客户机ip地址
-	//header->ID = htons(header->ID);//转换字节序
 	long current_time = GetTickCount();//记录下接收到包的时间
 	int k = 0;//判断是否有相同ID
 	short int hid = header->ID;//取ID字段
 	short int nhid;//更改后的ID
 	for (int i = 0; i < it_length; i++)
 	{
-		if (hid == new_id_table[i]) {//已有相同ID
+		if (hid == new_id_table[i]) 
+		{//已有相同ID
 			k = 1;
 			break;
 		}
@@ -426,6 +428,95 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 	}
 	QNAME[now_pos] = '\0';
 
+	if (dFlag)
+	{
+		printf("time = %lld\nID = %u\nclientIP = %s\nrequestedDomainName = %s\n\n\n", time(NULL), header->ID, inet_ntoa(cli_ip.sin_addr), QNAME);
+	}
+	if (ddFlag)
+	{
+		printf("    HEADER:\n");
+		printf("        opcode = ");
+		if ((header->FLAGS & 0x7800) == 0x0000)
+		{
+			printf("Query, ");
+		}
+		else if ((header->FLAGS & 0x7800) == 0x0800)
+		{
+			printf("IQuery, ");
+		}
+		else if ((header->FLAGS & 0x7800) == 0x1000)
+		{
+			printf("Status, ");
+		}
+		else if ((header->FLAGS & 0x7800) == 0x2000)
+		{
+			printf("Notify, ");
+		}
+		else if ((header->FLAGS & 0x7800) == 0x2800)
+		{
+			printf("Update, ");
+		}
+		else
+		{
+			printf("Unassigned, ");
+		}
+		printf("id = %u, ", header->ID);
+		printf("rcode = ");
+		if ((header->FLAGS & 0x000F) == 0x0000)
+		{
+			printf("NoError\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0001)
+		{
+			printf("FormErr\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0002)
+		{
+			printf("ServFail\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0003)
+		{
+			printf("NXDomain\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0004)
+		{
+			printf("NotImp\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0005)
+		{
+			printf("Refused\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0006)
+		{
+			printf("YXDomain\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0007)
+		{
+			printf("YXRRSet\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0008)
+		{
+			printf("NXRRSet\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x0009)
+		{
+			printf("NotAuth\n");
+		}
+		else if ((header->FLAGS & 0x000F) == 0x000A)
+		{
+			printf("NotZone\n");
+		}
+		else
+		{
+			printf("Unassigned\n");
+		}
+		printf("        questions = %u, answers = %u, authority records = %u, additional = %u\n\n", header->QDCOUNT, header->ANCOUNT, header->NSCOUNT, header->ARCOUNT);
+		printf("    QUESTIONS:\n");
+		printf("        QName = %s\n", QNAME);
+		
+
+	}
+
 	//将收到header中字节序改为网络字节序
 	
 	header->FLAGS = htons(header->FLAGS);
@@ -446,6 +537,11 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 	c_byte += 2;
 
 	int tp = ntohs(*type);
+	if (ddFlag)
+	{
+		printf("        QType = %d\n", tp);
+		printf("        QClass = %d\n", ntohs(*(unsigned short*)(receiveBuffer + c_byte)));
+	}
 	//printf("请求查询类型: %d\n",tp);
 	char *zErrMsg = 0;
 
@@ -638,6 +734,7 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 
 void resp_pro(dns_header *header, char *receiveBuffer)
 {
+	
 	SOCKADDR_IN q_ip;//此包应回复给的客户机ip
 	long ctime = GetTickCount();//记录当前接收到包的时间
 	int time_out = 0;//记录是否是超时包
@@ -682,20 +779,114 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 	//取AA
 	if ((header->FLAGS & 0x0400) == 0x0400) 
 	{//授权答案
-		//printf("权威答案\n");
+		if (ddFlag)
+		{
+			printf("\n------------\n");
+			printf("权威应答\n");
+			printf("------------\n");
+		}
 	}
 	else 
 	{
-		//printf("非权威答案\n");
+		if (ddFlag)
+		{
+			printf("\n------------\n");
+			printf("非权威应答\n");
+			printf("------------\n");
+		}
 	}
 
 	//判断RCODE
 	if ((header->FLAGS & 0x000F) == 0x0003) 
 	{//RCODE为3表示域名出错
 		//printf("未查询到此域名\n\n");
+		printf("Non-existent domain\n\n");
 	}
 	else 
-	{//解析响应包
+	{
+		if (ddFlag)
+		{
+			printf("Got answer:\n");
+			printf("    HEADER:\n");
+			printf("        opcode = ");
+			if ((header->FLAGS & 0x7800) == 0x0000)
+			{
+				printf("Query, ");
+			}
+			else if ((header->FLAGS & 0x7800) == 0x0800)
+			{
+				printf("IQuery, ");
+			}
+			else if ((header->FLAGS & 0x7800) == 0x1000)
+			{
+				printf("Status, ");
+			}
+			else if ((header->FLAGS & 0x7800) == 0x2000)
+			{
+				printf("Notify, ");
+			}
+			else if ((header->FLAGS & 0x7800) == 0x2800)
+			{
+				printf("Update, ");
+			}
+			else
+			{
+				printf("Unassigned, ");
+			}
+			printf("id = %u, ", header->ID);
+			printf("rcode = ");
+			if ((header->FLAGS & 0x000F) == 0x0000)
+			{
+				printf("NoError\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0001)
+			{
+				printf("FormErr\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0002)
+			{
+				printf("ServFail\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0003)
+			{
+				printf("NXDomain\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0004)
+			{
+				printf("NotImp\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0005)
+			{
+				printf("Refused\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0006)
+			{
+				printf("YXDomain\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0007)
+			{
+				printf("YXRRSet\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0008)
+			{
+				printf("NXRRSet\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x0009)
+			{
+				printf("NotAuth\n");
+			}
+			else if ((header->FLAGS & 0x000F) == 0x000A)
+			{
+				printf("NotZone\n");
+			}
+			else
+			{
+				printf("Unassigned\n");
+			}
+			printf("        questions = %u, answers = %u, authority records = %u, additional = %u\n\n", header->QDCOUNT, header->ANCOUNT, header->NSCOUNT, header->ARCOUNT);
+		}
+		
+		//解析响应包
 		//printf("\n");
 		//判断请求个数和资源记录个数
 		int ques = header->QDCOUNT;//query字段个数
@@ -730,9 +921,13 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			*type = ntohs(*type);
 			*Class = ntohs(*Class);
 			//输出查询问题信息
-			//printf("    QName：%s\n", doName);
-			//printf("    QType：%d\n", *type);
-			//printf("    QClass：%d\n\n", *Class);
+			if (ddFlag)
+			{
+				printf("    QUESTIONS:\n");
+				printf("        QName = %s\n", doName);
+				printf("        QType = %d\n", *type);
+				printf("        QClass = %d\n", *Class);
+			}
 			*type = htons(*type);
 			*Class = htons(*Class);
 		}
@@ -741,9 +936,17 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 		for (int i = 0; i < reso; i++)
 		{
 			//当解析到某种字段时，输出提示信息
-			/*if (i == 0)  printf("Anwser Section（%d个）：\n\n", requ);
-			if (i == requ)  printf("Authority Records Section（%d个）：\n\n", aure);
-			if (i == requ + aure)  printf("Additional Records Section（%d个）：\n\n", adre);*/
+			if (ddFlag)
+			{
+				
+				if (i == 0)
+				{
+					printf("    ANSWERS:\n");
+					printf("        number of Anwser Section = %d\n", requ);
+				}
+				if (i == requ)  printf("        number of Authority Records Section = %d\n", aure);
+				if (i == requ + aure)  printf("        number of Additional Records Section = %d\n", adre);
+			}
 
 			char doname[QNAME_MAX_LENTH];//域名或邮件地址后缀名
 			int length = 0;//域名或邮件地址后缀名占用的字节数
@@ -769,10 +972,13 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			*Class = ntohs(*Class);
 			*ttl = ntohl(*ttl);
 			*relength = ntohs(*relength);
-			/*printf("    Name：%s\n", doname);
-			printf("    Type：%d\n", *type);
-			printf("    Class：%d\n", *Class);
-			printf("    TTL：%ld\n", *ttl);*/
+			if (ddFlag)
+			{
+				printf("    ->  Name = %s\n", doname);
+				printf("        Type = %d\n", *type);
+				printf("        Class = %d\n", *Class);
+				printf("        TTL = %ld (%ld secs)\n", *ttl, *ttl);
+			}
 
 			char storeData[BUFFER_SIZE];
 			char *zErrMsg = 0;
@@ -787,9 +993,11 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 			lenth[1] = aliasLen;//别名长度
 			lenth[3] = 2;//class长度
 			lenth[4] = ttlLen;
-
-//			printf("    DataLenth: %d\n", doNameLen);
-//			printf("    TTL:%d\n", TTL);
+			if (ddFlag)
+			{
+				printf("        DataLenth = %d\n", doNameLen);
+				//printf("        TTL:%d\n", TTL);
+			}
 			if (*type == 1)
 			{//IP地址类型
 				unsigned char ip_address[4];
@@ -801,7 +1009,10 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				storeData[6] = ip_address[2] = receiveBuffer[c_byte + 2];
 				storeData[7] = ip_address[3] = receiveBuffer[c_byte + 3];
 				storeData[8] = '\0';
-				//printf("    IP：%d.%d.%d.%d\n\n", ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+				if (ddFlag)
+				{
+					printf("        Internet Address = %d.%d.%d.%d\n", ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+				}
 				
 				string ip = translate_IP(ip_address);	
 				int ipLen = ip.length();//ip地址长度
@@ -826,8 +1037,11 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				
  				lenth[5] = (std::to_string(length)).length();
 				lenth[6] = str_len(dname);
-				//printf("    Name Length：%d\n\n", length);
-				//printf("    Name Server：%s\n\n", dname);
+				if (ddFlag)
+				{
+					printf("        Name Length = %d\n", length);
+					printf("        Name Server = %s\n", dname);
+				}
 				if (!query_NS_record(db, zErrMsg, doName, doNameLen, dname, lenth[6]))//如果数据库中无该NS记录则存储
 					insert_NS_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length, dname, lenth);
 			}
@@ -845,7 +1059,10 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				lenth[6] = str_len(cname);
 				if(!query_CNAME_record(db, zErrMsg, doName, doNameLen, cname, lenth[6]))//如果数据库中无该CN记录则存储
 				  insert_CNAME_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length, cname, lenth);
-				//printf("    CName：%s\n\n", cname);
+				if (ddFlag)
+				{
+					printf("        CName = %s\n", cname);
+				}
 			}
 			else if (*type == 15)
 			{//MX类型
@@ -864,8 +1081,11 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 				lenth[5] = (std::to_string(length)).length();
 				lenth[6] = (std::to_string((int)*preference)).length();
 				lenth[7] = str_len(mname);
-				//printf("    Preference：%d\n", *preference);
-				//printf("    Mail Exchange：%s\n\n", mname);
+				if (ddFlag)
+				{
+					printf("        Preference = %d\n", *preference);
+					printf("        Mail Exchange = %s\n", mname);
+				}
 				if (!query_MX_record(db, zErrMsg, doName, doNameLen, mname, lenth[7]))//判断数据库中是否有MX记录
 					insert_MX_record(db, zErrMsg, doName, doname, storeData, storeData + 2, TTL, length + lenth[6], (int)*preference, mname, lenth);
 				*preference = htons(*preference);
@@ -939,7 +1159,7 @@ int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *re
 	return length;//返回域名占用长度
 }
 
-void connect_string(char *a, char *b, int aLength, int bLength)
+void connect_string(char *a, char *b, int aLength, int bLength)//将字符串b连接到字符串a的末端
 {
 	int i;
 	for (i = 0; i < bLength; i++)
@@ -949,7 +1169,7 @@ void connect_string(char *a, char *b, int aLength, int bLength)
 	a[aLength + i] = 0;
 }
 
-void connect_string(char *a, const char *b, int aLength, int bLength)
+void connect_string(char *a, const char *b, int aLength, int bLength)//将字符串b连接到字符串a的末端
 {
 	int i;
 	for (i = 0; i < bLength; i++)
@@ -960,7 +1180,7 @@ void connect_string(char *a, const char *b, int aLength, int bLength)
 }
 
 void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, const char *Address, int *length)
-{
+{//向数据库的A_RECORD表中插入一条数据
 	int sqlLength;
 	char temSql[SQL_MAX] = "INSERT INTO A_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Address) VALUES (";
 	sqlLength = strlen(temSql);
@@ -1000,13 +1220,13 @@ void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *
 		sqlite3_free(zErrMsg);
 	}
 	else {
-		fprintf(stdout, "Operation done successfully\n");
+		//fprintf(stdout, "Operation done successfully\n");
 	}
 
 }
 
 int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const char *Address, int addLength)
-{
+{//根据域名和Address在A_RECORD中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1034,7 +1254,7 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const
 } 
 
 int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
-{
+{//根据域名在A_RECORD中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1077,7 +1297,7 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRe
 }
 
 void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *CNAME, int *length)
-{
+{//向数据库的表CNAME_RECORD中插入一条数据
 	int sqlLength;
 	char temSql[SQL_MAX] = "INSERT INTO CNAME_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, CNAME) VALUES (";
 	sqlLength = strlen(temSql);
@@ -1118,13 +1338,13 @@ void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, ch
 		sqlite3_free(zErrMsg);
 	}
 	else {
-		fprintf(stdout, "Operation done successfully\n");
+		//fprintf(stdout, "Operation done successfully\n");
 	}
 
 }
 
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength,  resRecord *record)
-{
+{//根据域名在CNAME_RECORD中查找数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1167,7 +1387,7 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength, 
 }
 
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *CNAME, int CNLength)
-{
+{//根据域名和CNAME在CNAME_RECORD中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1199,7 +1419,7 @@ int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, c
 }
 
 void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, int Preference, char *MX, int *length)
-{
+{//向数据库的MX_RECORD表中插入一条数据
 	int sqlLength;
 	char temSql[SQL_MAX] = "INSERT INTO MX_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Preference, Mail_Exchange) VALUES (";
 	sqlLength = strlen(temSql);
@@ -1243,13 +1463,13 @@ void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char 
 		sqlite3_free(zErrMsg);
 	}
 	else {
-		fprintf(stdout, "Operation done successfully\n");
+		//fprintf(stdout, "Operation done successfully\n");
 	}
 
 }
 
 void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *NS, int *length)
-{
+{//向数据库的NS_RECORD表中插入一条数据
 	int sqlLength;
 	char temSql[SQL_MAX] = "INSERT INTO NS_RECORD (Name, Alias, Type, Class, Time_to_live, Data_length, Name_Server) VALUES (";
 	sqlLength = strlen(temSql);
@@ -1289,13 +1509,13 @@ void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char 
 		sqlite3_free(zErrMsg);
 	}
 	else {
-		fprintf(stdout, "Operation done successfully\n");
+		//fprintf(stdout, "Operation done successfully\n");
 	}
 
 }
 
 int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
-{
+{//根据域名在MX_RECORD中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1342,7 +1562,7 @@ int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resR
 }
 
 int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *mName, int mNameLen)
-{
+{//根据域名和MX在MX_RECORD中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1371,7 +1591,7 @@ int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char
 }
 
 int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *NAME_SERVER, int nameServerLen)
-{
+{//根据域名和NS在数据库中查询数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1399,7 +1619,7 @@ int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char
 }
 
 int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records)
-{
+{//根据域名在NS_RECORD中查找数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1443,7 +1663,7 @@ int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resR
 }
 
 int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength)
-{
+{//根据域名在UNDESIRABLE_WEB_TABLE中查找数据
 	int ret = 0;
 	sqlite3_stmt *statement;
 	int sqlLength;
@@ -1466,4 +1686,229 @@ int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nam
 		//printf("address = %s\n", address);
 	}
 	return res;
+}
+
+
+void delete_expired_data(sqlite3 *db, char *zErrMsg)
+{//定期删除数据库中超时的记录
+	int ret = 0;
+	sqlite3_stmt *statement;
+	time_t a1 = time(NULL);
+	while (1)
+	{
+		mt.lock();
+		//printf("passed %d second(s)\n", (int)(time(0) - a1));
+		char sql[SQL_MAX] = "SELECT Name, Time_to_live, Address, Time_Stamp from A_RECORD";
+		ret = sqlite3_prepare(db, sql, -1, &statement, NULL);
+		if (ret != SQLITE_OK)
+		{
+			printf("prepare error ret : %d\n", ret);
+			return;
+		}
+		while (sqlite3_step(statement) == SQLITE_ROW)
+		{
+			char* Name = (char *)sqlite3_column_text(statement, 0);
+			int TTL = sqlite3_column_int(statement, 1);
+			char* Address = (char *)sqlite3_column_text(statement, 2);
+			char* timeStamp = (char *)sqlite3_column_text(statement, 3);
+			//printf("%s %d %s %s\n", Name, TTL, Address, timeStamp);
+			tm tmTimeStamp = { 0,0,0,0,0,0,0,0 };
+			sscanf_s(timeStamp, "%d-%d-%d %d:%d:%d", &tmTimeStamp.tm_year, &tmTimeStamp.tm_mon, &tmTimeStamp.tm_mday, \
+				&tmTimeStamp.tm_hour, &tmTimeStamp.tm_min, &tmTimeStamp.tm_sec);
+			tmTimeStamp.tm_year -= 1900;
+			tmTimeStamp.tm_mon--;
+			time_t timeStampToSec = mktime(&tmTimeStamp);
+			time_t currentTime = time(NULL);
+			long timeDifferece = (long)(currentTime - timeStampToSec);
+			if (timeDifferece >= TTL)
+			{
+				int temSqlLength;
+				char temSql[SQL_MAX] = "delete from A_RECORD where Name = '";
+				temSqlLength = strlen(temSql);
+				connect_string(temSql, Name, temSqlLength, strlen(Name));
+				temSqlLength += strlen(Name);
+				connect_string(temSql, "' and Address = '", temSqlLength, 17);
+				temSqlLength += 17;
+				connect_string(temSql, Address, temSqlLength, strlen(Address));
+				temSqlLength += strlen(Address);
+				connect_string(temSql, "';", temSqlLength, 2);
+
+				ret = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+				if (ret != SQLITE_OK)
+				{
+					fprintf(stderr, "SQL error: %s\n", zErrMsg);
+					sqlite3_free(zErrMsg);
+				}
+				else
+				{
+					//fprintf(stdout, "delete %s %s from A_RECORD\n", Name, Address);
+				}
+			}
+
+		}
+
+
+		for (int i = 0; i < SQL_MAX; i++)
+		{
+			sql[i] = 0;
+		}
+		connect_string(sql, "SELECT Name, Time_to_live, CNAME, Time_Stamp from CNAME_RECORD", 0, 62);
+
+		ret = sqlite3_prepare(db, sql, -1, &statement, NULL);
+		if (ret != SQLITE_OK)
+		{
+			printf("prepare error ret : %d\n", ret);
+			return;
+		}
+		while (sqlite3_step(statement) == SQLITE_ROW)
+		{
+			char* Name = (char *)sqlite3_column_text(statement, 0);
+			int TTL = sqlite3_column_int(statement, 1);
+			char* CNAME = (char *)sqlite3_column_text(statement, 2);
+			char* timeStamp = (char *)sqlite3_column_text(statement, 3);
+			tm tmTimeStamp = { 0,0,0,0,0,0,0,0 };
+			sscanf_s(timeStamp, "%d-%d-%d %d:%d:%d", &tmTimeStamp.tm_year, &tmTimeStamp.tm_mon, &tmTimeStamp.tm_mday, \
+				&tmTimeStamp.tm_hour, &tmTimeStamp.tm_min, &tmTimeStamp.tm_sec);
+			tmTimeStamp.tm_year -= 1900;
+			tmTimeStamp.tm_mon--;
+			time_t timeStampToSec = mktime(&tmTimeStamp);
+			time_t currentTime = time(NULL);
+			long timeDifferece = (long)(currentTime - timeStampToSec);
+			if (timeDifferece >= TTL)
+			{
+				int temSqlLength;
+				char temSql[SQL_MAX] = "delete from CNAME_RECORD where Name = '";
+				temSqlLength = strlen(temSql);
+				connect_string(temSql, Name, temSqlLength, strlen(Name));
+				temSqlLength += strlen(Name);
+				connect_string(temSql, "' and CNAME = '", temSqlLength, 15);
+				temSqlLength += 15;
+				connect_string(temSql, CNAME, temSqlLength, strlen(CNAME));
+				temSqlLength += strlen(CNAME);
+				connect_string(temSql, "';", temSqlLength, 2);
+
+				ret = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+				if (ret != SQLITE_OK)
+				{
+					fprintf(stderr, "SQL error: %s\n", zErrMsg);
+					sqlite3_free(zErrMsg);
+				}
+				else
+				{
+					//fprintf(stdout, "delete %s %s from CNAME_RECORD\n", Name, CNAME);
+				}
+			}
+
+		}
+
+
+		for (int i = 0; i < SQL_MAX; i++)
+		{
+			sql[i] = 0;
+		}
+		connect_string(sql, "SELECT Name, Time_to_live, Mail_Exchange, Time_Stamp from MX_RECORD", 0, 67);
+
+		ret = sqlite3_prepare(db, sql, -1, &statement, NULL);
+		if (ret != SQLITE_OK)
+		{
+			printf("prepare error ret : %d\n", ret);
+			return;
+		}
+		while (sqlite3_step(statement) == SQLITE_ROW)
+		{
+			char* Name = (char *)sqlite3_column_text(statement, 0);
+			int TTL = sqlite3_column_int(statement, 1);
+			char* MX = (char *)sqlite3_column_text(statement, 2);
+			char* timeStamp = (char *)sqlite3_column_text(statement, 3);
+			tm tmTimeStamp = { 0,0,0,0,0,0,0,0 };
+			sscanf_s(timeStamp, "%d-%d-%d %d:%d:%d", &tmTimeStamp.tm_year, &tmTimeStamp.tm_mon, &tmTimeStamp.tm_mday, \
+				&tmTimeStamp.tm_hour, &tmTimeStamp.tm_min, &tmTimeStamp.tm_sec);
+			tmTimeStamp.tm_year -= 1900;
+			tmTimeStamp.tm_mon--;
+			time_t timeStampToSec = mktime(&tmTimeStamp);
+			time_t currentTime = time(NULL);
+			long timeDifferece = (long)(currentTime - timeStampToSec);
+			if (timeDifferece >= TTL)
+			{
+				int temSqlLength;
+				char temSql[SQL_MAX] = "delete from MX_RECORD where Name = '";
+				temSqlLength = strlen(temSql);
+				connect_string(temSql, Name, temSqlLength, strlen(Name));
+				temSqlLength += strlen(Name);
+				connect_string(temSql, "' and Mail_Exchange = '", temSqlLength, 23);
+				temSqlLength += 23;
+				connect_string(temSql, MX, temSqlLength, strlen(MX));
+				temSqlLength += strlen(MX);
+				connect_string(temSql, "';", temSqlLength, 2);
+
+				ret = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+				if (ret != SQLITE_OK)
+				{
+					fprintf(stderr, "SQL error: %s\n", zErrMsg);
+					sqlite3_free(zErrMsg);
+				}
+				else
+				{
+					//fprintf(stdout, "delete %s %s from MX_RECORD\n", Name, MX);
+				}
+			}
+
+		}
+
+
+		for (int i = 0; i < SQL_MAX; i++)
+		{
+			sql[i] = 0;
+		}
+		connect_string(sql, "SELECT Name, Time_to_live, Name_Server, Time_Stamp from NS_RECORD", 0, 65);
+
+		ret = sqlite3_prepare(db, sql, -1, &statement, NULL);
+		if (ret != SQLITE_OK)
+		{
+			printf("prepare error ret : %d\n", ret);
+			return;
+		}
+		while (sqlite3_step(statement) == SQLITE_ROW)
+		{
+			char* Name = (char *)sqlite3_column_text(statement, 0);
+			int TTL = sqlite3_column_int(statement, 1);
+			char* NS = (char *)sqlite3_column_text(statement, 2);
+			char* timeStamp = (char *)sqlite3_column_text(statement, 3);
+			tm tmTimeStamp = { 0,0,0,0,0,0,0,0 };
+			sscanf_s(timeStamp, "%d-%d-%d %d:%d:%d", &tmTimeStamp.tm_year, &tmTimeStamp.tm_mon, &tmTimeStamp.tm_mday, \
+				&tmTimeStamp.tm_hour, &tmTimeStamp.tm_min, &tmTimeStamp.tm_sec);
+			tmTimeStamp.tm_year -= 1900;
+			tmTimeStamp.tm_mon--;
+			time_t timeStampToSec = mktime(&tmTimeStamp);
+			time_t currentTime = time(NULL);
+			long timeDifferece = (long)(currentTime - timeStampToSec);
+			if (timeDifferece >= TTL)
+			{
+				int temSqlLength;
+				char temSql[SQL_MAX] = "delete from NS_RECORD where Name = '";
+				temSqlLength = strlen(temSql);
+				connect_string(temSql, Name, temSqlLength, strlen(Name));
+				temSqlLength += strlen(Name);
+				connect_string(temSql, "' and Name_Server = '", temSqlLength, 21);
+				temSqlLength += 21;
+				connect_string(temSql, NS, temSqlLength, strlen(NS));
+				temSqlLength += strlen(NS);
+				connect_string(temSql, "';", temSqlLength, 2);
+
+				ret = sqlite3_exec(db, temSql, callback, 0, &zErrMsg);
+				if (ret != SQLITE_OK)
+				{
+					fprintf(stderr, "SQL error: %s\n", zErrMsg);
+					sqlite3_free(zErrMsg);
+				}
+				else
+				{
+					//fprintf(stdout, "delete %s %s from NS_RECORD\n", Name, NS);
+				}
+			}
+
+		}
+		mt.unlock();
+		Sleep(DELETE_INTERVAL);
+	}
 }

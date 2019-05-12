@@ -14,6 +14,11 @@ int last;//接受数据的长度
 short int old_id_table[IDTABLE_SIZE];//原始ID表
 short int new_id_table[IDTABLE_SIZE];//更改后的ID表
 
+int dFlag = 0;
+int ddFlag = 0;
+char SUPERIOR_SERVER_ADDRESS[15] = "10.3.9.5";
+char filePath[SQL_MAX] = "data.db";
+
 void init_database(sqlite3 *db, int rc)
 {
 	char *zErrMsg = 0;
@@ -28,13 +33,78 @@ void init_database(sqlite3 *db, int rc)
 	}
 }
 
-int main() {
+int main(int argc, char *argv[]) 
+{
+	int nsFlag = 0, fileFlag = 0;//分别标识输入参数中是否有名字服务器的指定, 配置文件路径的指定
+	for (int i = 1; i < argc; i++)
+	{
+		if (!strcmp(argv[i], "-d"))
+		{
+			if (!dFlag && !ddFlag && !nsFlag && !fileFlag)
+			{
+				dFlag = 1;
+			}
+			else
+			{
+				printf("ERROR: debugging information parameter\n");
+				exit(0);
+			}
+		}
+		else if (!strcmp(argv[i], "-dd"))
+		{
+			if (!dFlag && !ddFlag && !nsFlag && !fileFlag)
+			{
+				ddFlag = 1;
+			}
+			else
+			{
+				printf("ERROR: debugging information parameter\n");
+				exit(0);
+			}
+		}
+		else if (argv[i][0] >= '0' && argv[i][0] <= '9')
+		{
+			if (!nsFlag && !fileFlag)
+			{
+				nsFlag = 1;
+				for (int i = 0; i < 15; i++)
+				{
+					SUPERIOR_SERVER_ADDRESS[i] = 0;
+				}
+				connect_string(SUPERIOR_SERVER_ADDRESS, argv[i], 0, strlen(argv[i]));
+			}
+			else
+			{
+				printf("ERROR: debugging information parameter\n");
+				exit(0);
+			}
+		}
+		else
+		{
+			if (!fileFlag)
+			{
+				fileFlag = 1;
+				for (int i = 0; i < SQL_MAX; i++)
+				{
+					filePath[i] = 0;
+				}
+				connect_string(filePath, argv[i], 0, strlen(argv[i]));
+			}
+			else
+			{
+				printf("ERROR: debugging information parameter\n");
+				exit(0);
+			}
+		}
+
+	}
+	
 
 	WSADATA WSAData;//windows socket初始化信息
 	char receiveBuffer[BUFFER_SIZE];
 	int rc;
 	
-	rc = sqlite3_open("data.db", &db);
+	rc = sqlite3_open(filePath, &db);
  
 	init_table(old_id_table, -1);//初始化原始ID表
 	init_table(new_id_table, -1);//初始化更改后的ID表
@@ -58,7 +128,7 @@ int main() {
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_port = htons(53);
 	serverAddress.sin_addr.S_un.S_addr = INADDR_ANY;
-	if (bind(serverSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress)) == SOCKET_ERROR)
+	if (::bind(serverSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress)) == SOCKET_ERROR)
 	{//服务器与本地地址绑定
 		printf("Failed socket() %d \n", WSAGetLastError());
 		return 0;
@@ -67,6 +137,11 @@ int main() {
 	SOCKADDR_IN addr_Clt;
 
 	int fromlen = sizeof(SOCKADDR);
+
+	char *zErrMsg = 0;
+	thread t1(delete_expired_data, db, zErrMsg);//为delete_expired_data(sqlite3 *db, char *zErrMsg)创建一个线程
+	t1.detach();
+
 	while (1)
 	{
 		last = recvfrom(serverSocket, receiveBuffer, BUFFER_SIZE, 0, (SOCKADDR*)&addr_Clt, &fromlen);
@@ -96,12 +171,18 @@ int main() {
 
 				if ((header->FLAGS & 0x8000) == 0x8000)//为响应包
 				{
-					//printf("\n\n-------Response Package-------\n");
+					/*if (dFlag || ddFlag)
+					{
+						printf("\n\n-------Response Package-------\n");
+					}*/
 					resp_pro(header, receiveBuffer);
 				}
 				else//请求包
 				{
-					//printf("\n\n-------Query Package-------\n");
+					//if (dFlag || ddFlag)
+					//{
+					//	//printf("\n\n-------Query Package-------\n");
+					//}
 					query_pro(header, receiveBuffer, addr_Clt);//请求处理
 				}
 

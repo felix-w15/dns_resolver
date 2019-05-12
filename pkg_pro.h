@@ -7,6 +7,9 @@
 #include<map>
 #include<sstream>
 #include<time.h>
+//#include<Windows.h>
+#include<thread>
+
 
 #include"sqlite3.h"
 
@@ -14,10 +17,12 @@
 
 #define BUFFER_SIZE 1024
 #define QNAME_MAX_LENTH 256 
-#define SUPERIOR_SERVER_ADDRESS "10.3.9.5" //上一级服务器地址
+//#define SUPERIOR_SERVER_ADDRESS "10.3.9.5" //上一级服务器地址
 #define SQL_MAX 4096 //sql语句最大长度
 #define RESO_MAX 1024 //资源最多记录数不超过1024
 #define DOMAIN_LEN_MAX 256 //域名最长长度
+
+#define DELETE_INTERVAL 2000 //定期删除数据库中超时记录的时间间隔
 
 
 using namespace std;
@@ -86,6 +91,10 @@ extern sqlite3 *db;//sqlite3数据库初始化信息
 extern map<string, unsigned short> *mapDomainName;
 extern SOCKET serverSocket;
 
+extern int dFlag, ddFlag;//输入参数中是否含-d, -dd的标识
+extern char SUPERIOR_SERVER_ADDRESS[15];//存储输入参数中指定的名字服务器的IP地址
+extern char filePath[4096];//存储输入参数中指定的配置文件的路径
+
 void init_table(short int t[], short int q);//数组初始化
 void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip);//请求包处理
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip);//转发至高一级域名服务器
@@ -126,4 +135,6 @@ void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
 void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
 
 int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength);//查询屏蔽信息表
+
+void delete_expired_data(sqlite3 *db, char *zErrMsg);//定期删除数据库中超时的记录
 #endif // PKG_PRO_H__
