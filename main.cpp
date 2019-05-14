@@ -99,7 +99,6 @@ int main(int argc, char *argv[])
 
 	}
 	
-
 	WSADATA WSAData;//windows socket初始化信息
 	char receiveBuffer[BUFFER_SIZE];
 	int rc;
@@ -110,7 +109,6 @@ int main(int argc, char *argv[])
 	init_table(new_id_table, -1);//初始化更改后的ID表
 	init_database(db, rc);//初始化数据库
 	
-
 	if (WSAStartup(MAKEWORD(2, 2), &WSAData) != 0)
 	{
 		printf("fail to initialize\n");
@@ -135,9 +133,7 @@ int main(int argc, char *argv[])
 	}
 
 	SOCKADDR_IN addr_Clt;
-
 	int fromlen = sizeof(SOCKADDR);
-
 	char *zErrMsg = 0;
 	thread t1(delete_expired_data, db, zErrMsg);//为delete_expired_data(sqlite3 *db, char *zErrMsg)创建一个线程
 	t1.detach();
@@ -145,48 +141,26 @@ int main(int argc, char *argv[])
 	while (1)
 	{
 		last = recvfrom(serverSocket, receiveBuffer, BUFFER_SIZE, 0, (SOCKADDR*)&addr_Clt, &fromlen);
-		if (last > 0)
-		{      //判断接收到的数据是否为空
-			receiveBuffer[last] = '\0';//给字符数组加一个'\0'，表示结束了。不然输出有乱码
-			if (strcmp(receiveBuffer, "bye") == 0)
+		if (last > 0)//判断接收到的数据是否为空
+		{      
+			receiveBuffer[last] = '\0';//给字符数组加终止符
+            //创建header
+			dns_header *header;
+			header = (dns_header *)receiveBuffer;
+			header->ID = ntohs(header->ID);
+			header->FLAGS = ntohs(header->FLAGS);
+			header->QDCOUNT = ntohs(header->QDCOUNT);
+			header->ANCOUNT = ntohs(header->ANCOUNT);
+			header->NSCOUNT = ntohs(header->NSCOUNT);
+			header->ARCOUNT = ntohs(header->ARCOUNT);
+			//printf("\n-----ID:%d FLAGS:%d qcount:%d------\n%d\n", header->ID, header->FLAGS, header->QDCOUNT,last);
+			if ((header->FLAGS & 0x8000) == 0x8000)//为响应包
 			{
-				printf("客户端不跟我聊天了...");
-				closesocket(serverSocket);
-				return 0;
+				resp_pro(header, receiveBuffer);
 			}
-			else
+			else//请求包
 			{
-                //创建header
-				dns_header *header;
-				header = (dns_header *)receiveBuffer;
-				header->ID = ntohs(header->ID);
-				header->FLAGS = ntohs(header->FLAGS);
-				header->QDCOUNT = ntohs(header->QDCOUNT);
-				header->ANCOUNT = ntohs(header->ANCOUNT);
-				header->NSCOUNT = ntohs(header->NSCOUNT);
-				header->ARCOUNT = ntohs(header->ARCOUNT);
-
-				//printf("\n-----ID:%d FLAGS:%d qcount:%d------\n%d\n", header->ID, header->FLAGS, header->QDCOUNT,last);
-
-
-				if ((header->FLAGS & 0x8000) == 0x8000)//为响应包
-				{
-					/*if (dFlag || ddFlag)
-					{
-						printf("\n\n-------Response Package-------\n");
-					}*/
-					resp_pro(header, receiveBuffer);
-				}
-				else//请求包
-				{
-					//if (dFlag || ddFlag)
-					//{
-					//	//printf("\n\n-------Query Package-------\n");
-					//}
-					query_pro(header, receiveBuffer, addr_Clt);//请求处理
-				}
-
-
+				query_pro(header, receiveBuffer, addr_Clt);//请求处理
 			}
 		}
 	}

@@ -7,21 +7,17 @@
 #include<map>
 #include<sstream>
 #include<time.h>
-//#include<Windows.h>
 #include<thread>
 
 
 #include"sqlite3.h"
 
 #define IDTABLE_SIZE 256
-
 #define BUFFER_SIZE 1024
 #define QNAME_MAX_LENTH 256 
-//#define SUPERIOR_SERVER_ADDRESS "10.3.9.5" //ÉÏÒ»¼¶·şÎñÆ÷µØÖ·
 #define SQL_MAX 4096 //sqlÓï¾ä×î´ó³¤¶È
 #define RESO_MAX 1024 //×ÊÔ´×î¶à¼ÇÂ¼Êı²»³¬¹ı1024
 #define DOMAIN_LEN_MAX 256 //ÓòÃû×î³¤³¤¶È
-
 #define DELETE_INTERVAL 2000 //¶¨ÆÚÉ¾³ıÊı¾İ¿âÖĞ³¬Ê±¼ÇÂ¼µÄÊ±¼ä¼ä¸ô
 
 
@@ -88,8 +84,8 @@ extern SOCKADDR_IN client_ip[IDTABLE_SIZE];//´æ·Å¿Í»§»úµÄipµØÖ·£¬ÓÃÒÔ·¢´ğ¸´°üÒÔ¼
 extern short int old_id_table[IDTABLE_SIZE];//Ô­Ê¼ID±í
 extern short int new_id_table[IDTABLE_SIZE];//¸ü¸ÄºóµÄID±í£¬°´ID´ÓĞ¡µ½´óµÄË³Ğò´æ´¢
 extern sqlite3 *db;//sqlite3Êı¾İ¿â³õÊ¼»¯ĞÅÏ¢
-extern map<string, unsigned short> *mapDomainName;
-extern SOCKET serverSocket;
+extern map<string, unsigned short> *mapDomainName;//´æ´¢Ñ¹ËõÓòÃû-×Ö½ÚÎ»ÖÃµÄ×Öµä
+extern SOCKET serverSocket;//Í¨ĞÅÌ×½Ó×Ö
 
 extern int dFlag, ddFlag;//ÊäÈë²ÎÊıÖĞÊÇ·ñº¬-d, -ddµÄ±êÊ¶
 extern char SUPERIOR_SERVER_ADDRESS[15];//´æ´¢ÊäÈë²ÎÊıÖĞÖ¸¶¨µÄÃû×Ö·şÎñÆ÷µÄIPµØÖ·
@@ -101,40 +97,40 @@ void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR
 void resp_pro(dns_header *header, char *receiveBuffer);//ÏìÓ¦°ü´¦Àí
 void connect_string(char *a, char *b);//Á¬½Ó×Ö·û´®
 
-int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);
-int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const char *Address, int addLength);
-void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength,const char *Address, int *length);
+int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//²éÑ¯AÀàĞÍ¼ÇÂ¼
+int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const char *Address, int addLength);//²éÑ¯AÀàĞÍ¼ÇÂ¼ÖØÔØ
+void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength,const char *Address, int *length);//´æ´¢AÀàĞÍ¼ÇÂ¼
 
-void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *CNAME, int *length);
+void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *CNAME, int *length);//´æ´¢CNAMEÀàĞÍ¼ÇÂ¼
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength, resRecord *record);//²éÑ¯ÌØ¶¨È¨ÍşÃû¼ÇÂ¼
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *CNAME, int CNLength);////²éÑ¯ÌØ¶¨È¨ÍşÃû¼ÇÂ¼ÖØÔØ
+
+void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *NS, int *length);//²åÈëNSÀàĞÍ¼ÇÂ¼
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//²éÑ¯MX¼ÇÂ¼
+int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *mName, int mNameLen);//²éÑ¯MX¼ÇÂ¼ÖØÔØ
+
+void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, int Preference, char *MX, int *length);//²åÈëMXÀàĞÍ¼ÇÂ¼
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *NAME_SERVER, int nameServerLen);//²éÑ¯NS¼ÇÂ¼
+int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//²éÑ¯NS¼ÇÂ¼µÄÖØÔØ
+
+int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength);//²éÑ¯ÆÁ±ÎĞÅÏ¢±í
 
 void connect_string(char *a, const char *b, int aLength, int bLength);//Á¬½Ó×Ö·û´®
 void connect_string(char *a, char *b, int aLength, int bLength);//Á¬½Ó×Ö·û´®
 
-string translate_IP(unsigned char* ip);
+string translate_IP(unsigned char* ip);//½«IPÓÉunsigned char*×ª»»Îªstring
 void insert_IP(char *ip, char *sendBuf, int *bytePos);//½«ip´æÈë·¢ËÍ»º³åÇø
 
 int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *receiveBuffer);//ÓòÃû½âÎö
 
-void a_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);//aÀàĞÍ¼ÇÂ¼´¦Àí
-void cn_records_pro(resRecord record, char *sendBuf, int *bytePos);//cnameÀàĞÍ¼ÇÂ¼´¦Àí
+void a_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);//aÀàĞÍÇëÇó´¦Àí
+void cn_records_pro(resRecord record, char *sendBuf, int *bytePos);//cnameÀàĞÍÇëÇó´¦Àí
+void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);//nsÀàĞÍÇëÇó´¦Àí
+void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);//mxÀàĞÍÇëÇó´¦Àí
 void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len);//cn_records_proÖØÔØ£¬Ö»Ö´ĞĞÒ»´Î
-void domain_pro(char* name, char *sendBuf, int *bytePos);//ÓòÃû´¦Àí
+unsigned short domain_pro(char* name, char *sendBuf, int *bytePos);//ÓòÃûÑ¹Ëõ´¦Àí
 void domainStore(char *domain, int len, int iniBytePos, string res);//½«ÓòÃû²¿·Ö´æÈë×ÖµäÖĞ
 
-void insert_NS_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *NS, int *length);//²åÈëNSÀàĞÍ¼ÇÂ¼
-void insert_MX_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, int Preference, char *MX, int *length);//²åÈëMXÀàĞÍ¼ÇÂ¼
-
-int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//²éÑ¯MX¼ÇÂ¼
-int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *mName, int mNameLen);//²éÑ¯MX¼ÇÂ¼ÖØÔØ
-int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *NAME_SERVER, int nameServerLen);//²éÑ¯NS¼ÇÂ¼
-int query_NS_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//²éÑ¯NS¼ÇÂ¼µÄÖØÔØ
-
-void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
-void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos);
-
-int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength);//²éÑ¯ÆÁ±ÎĞÅÏ¢±í
-
 void delete_expired_data(sqlite3 *db, char *zErrMsg);//¶¨ÆÚÉ¾³ıÊı¾İ¿âÖĞ³¬Ê±µÄ¼ÇÂ¼
+
 #endif // PKG_PRO_H__

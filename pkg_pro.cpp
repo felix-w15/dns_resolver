@@ -12,7 +12,7 @@ map<string, unsigned short> *mapDomainName;//
 std::mutex mt;//互斥器
 
 
-static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
+static int callback(void *NotUsed, int argc, char **argv, char **azColName) {//打印错误信息相关
 	int i;
 	for (i = 0; i < argc; i++)
 	{
@@ -22,7 +22,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
 	return 0;
 }
 
-int str_len(char *str)
+int str_len(char *str)//求某字符串长度
 {
 	int i = 0;
 	while (str[i])
@@ -48,7 +48,7 @@ void insert_IP(char *ip, char *sendBuf, int *bytePos)//将ip存入发送缓冲区
 	string tmp = "";
 	for (int i = 0; i <= ipLen; i++)
 	{
-		if (i != ipLen && ip[i] != '.')
+		if (i != ipLen && ip[i] != '.')//未到结尾或未碰到'.'则连接string
 		{
 			char s[2] = { ip[i], 0 };
 			string c = s;
@@ -76,10 +76,10 @@ void init_table(short int t[], short int q)
 	}
 }
 
-void domainStore(char *domain, int len, int iniBytePos, string res)
+void domainStore(char *domain, int len, int iniBytePos, string res)//域名-字节位置存储以便实现压缩规则
 {	
 	if (len <= 0) return;
-	string tmp =  (res == "") ? "" : ('.' + res);
+	string tmp =  (res == "") ? "" : ('.' + res);//为了存储完整域名
 	int index = len - 1;
 	while (index >= -1)
 	{
@@ -99,11 +99,11 @@ void domainStore(char *domain, int len, int iniBytePos, string res)
 	}
 }
 
-void domain_pro(char* name, char *sendBuf, int *bytePos)
+unsigned short domain_pro(char* name, char *sendBuf, int *bytePos)
 {
 	int j = str_len(name) - 1;
 	int nameEndPos = j + 1;//查询name数组截止的位置
-	unsigned short ptrPos;//指针定位的值
+	unsigned short ptrPos, dataLen = 0;//指针定位的值
 	string tmp = "", res = "";
 	while (j >= -1)//域名压缩定位
 	{
@@ -135,8 +135,10 @@ void domain_pro(char* name, char *sendBuf, int *bytePos)
 		if (name[i] == '.' or name[i] == '\0')
 		{
 			sendBuf[*bytePos] = i - lastPos;
+			dataLen = dataLen + 1;//dataLen值增加
 			for (int j = 0; j < i - lastPos; j++)//将域名放入发送缓冲区
 			{
+				dataLen = dataLen + 1;//dataLen值增加
 				*bytePos = *bytePos + 1;
 				sendBuf[*bytePos] = name[j + lastPos];
 			}
@@ -149,6 +151,7 @@ void domain_pro(char* name, char *sendBuf, int *bytePos)
 	//将指针放入发送缓冲区
 	if (res != "")//使用了指针
 	{
+		dataLen = dataLen + 2;
 		sendBuf[*bytePos] = (char)192;
 		*bytePos = *bytePos + 1;
 
@@ -164,6 +167,7 @@ void domain_pro(char* name, char *sendBuf, int *bytePos)
 
 	//域名-字节位置存储
 	domainStore(name, i, iniBytePos, res);
+	return dataLen;
 }
 
 void a_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
@@ -208,27 +212,14 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
 		sendBuf[*bytePos + 1] = (char)((newRecord.TTL) >> 16);
 		sendBuf[*bytePos + 0] = (newRecord.TTL) >> 24;
 		*bytePos = *bytePos + 4;
-		sendBuf[*bytePos + 1] = (char)newRecord.DATALENGTH;
-		sendBuf[*bytePos + 0] = newRecord.DATALENGTH >> 8;
+		int dataLenPos = *bytePos;
 		*bytePos = *bytePos + 2;
+		unsigned short dataLen = domain_pro(newRecord.RDATA, sendBuf, bytePos);//求出data字段所占字节数
+		sendBuf[dataLenPos + 1] = (char)dataLen;
+		sendBuf[dataLenPos + 0] = dataLen >> 8;
 		domain_pro(newRecord.RDATA, sendBuf, bytePos);//域名处理
 		cname = newRecord.RDATA;//继续查询下一个CN
 	}
-	//test
-	/*int t = 0;
-	printf("\n*-*-*-*-*my-*-*-*-*\n");
-	while (t < *bytePos)
-	{
-		if (sendBuf[t] >= 65)
-		{
-			printf("%c", sendBuf[t]);
-
-		}
-		else
-			printf("%hx-", sendBuf[t]);
-		t++;
-	}
-	printf("\n*-*-*-*-*-*-*-*-*\n\n\n");*/
 }
 
 void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len)//cn_records_pro重载，只执行一次
@@ -248,10 +239,11 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos, int len)//cn_
 	sendBuf[*bytePos + 1] = (char)((newRecord.TTL) >> 16);
 	sendBuf[*bytePos + 0] = (newRecord.TTL) >> 24;
 	*bytePos = *bytePos + 4;
-	sendBuf[*bytePos + 1] = (char)newRecord.DATALENGTH;
-	sendBuf[*bytePos + 0] = newRecord.DATALENGTH >> 8;
+	int dataLenPos = *bytePos;
 	*bytePos = *bytePos + 2;
-	domain_pro(newRecord.RDATA, sendBuf, bytePos);//域名处理
+	unsigned short dataLen = domain_pro(newRecord.RDATA, sendBuf, bytePos);//求出data字段所占字节数
+	sendBuf[dataLenPos + 1] = (char)dataLen;
+	sendBuf[dataLenPos + 0] = dataLen >> 8;
 	
 }
 
@@ -271,10 +263,11 @@ void ns_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
 		sendBuf[*bytePos + 1] = (char)((records[i].TTL) >> 16);
 		sendBuf[*bytePos + 0] = (records[i].TTL) >> 24;
 		*bytePos = *bytePos + 4;
-		sendBuf[*bytePos + 1] = (char)records[i].DATALENGTH;
-		sendBuf[*bytePos + 0] = records[i].DATALENGTH >> 8;
+		int dataLenPos = *bytePos;
 		*bytePos = *bytePos + 2;
-		domain_pro(records[i].RDATA, sendBuf, bytePos);
+		unsigned short dataLen = domain_pro(records[i].RDATA, sendBuf, bytePos);//求出data字段所占字节数
+		sendBuf[dataLenPos + 1] = (char)dataLen;
+		sendBuf[dataLenPos + 0] = dataLen >> 8;	
 	}
 }
 
@@ -294,13 +287,13 @@ void mx_records_pro(resRecord *records, int len, char *sendBuf, int *bytePos)
 		sendBuf[*bytePos + 1] = (char)((records[i].TTL) >> 16);
 		sendBuf[*bytePos + 0] = (records[i].TTL) >> 24;
 		*bytePos = *bytePos + 4;
-		sendBuf[*bytePos + 1] = (char)records[i].DATALENGTH;
-		sendBuf[*bytePos + 0] = records[i].DATALENGTH >> 8;
-		*bytePos = *bytePos + 2;
-		sendBuf[*bytePos + 1] = (char)records[i].PREFERENCE;
-		sendBuf[*bytePos + 0] = records[i].PREFERENCE >> 8;
-		*bytePos = *bytePos + 2;
-		domain_pro(records[i].RDATA, sendBuf, bytePos);
+		int dataLenPos = *bytePos;
+		*bytePos = *bytePos + 4;
+		unsigned short dataLen = domain_pro(records[i].RDATA, sendBuf, bytePos) + 2;////求出data字段所占字节数，+2是由于包括preference字段两字节
+		sendBuf[dataLenPos + 1] = (char)dataLen;
+		sendBuf[dataLenPos + 0] = dataLen >> 8;
+		sendBuf[dataLenPos + 3] = (char)records[i].PREFERENCE;
+		sendBuf[dataLenPos + 2] = records[i].PREFERENCE >> 8;
 	}
 }
 
@@ -642,7 +635,7 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 			*(sendBuf + 6) = Answer >> 8;
 
 			cn_records_pro(*cnameRecord, sendBuf, &bytePos, 1);//cname记录处理成dns包数据流形式并存入发送缓冲区
-			//printf("本地存有%s域名的CNAME类型记录!\n\n", doName);
+			printf("本地存有%s域名的CNAME类型记录!\n\n", doName);
 			//转发给客户机
 			
 			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
@@ -719,7 +712,7 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 
 			mx_records_pro(mxRecord, queryMXResult, sendBuf, &bytePos);
 
-			printf("本地存有%s域名的NS类型记录!\n\n", doName);
+			printf("本地存有%s域名的MX类型记录!\n\n", doName);
 			//转发给客户机
 			sendto(serverSocket, sendBuf, bytePos, 0, (SOCKADDR*)&cli_ip, sizeof(SOCKADDR));
 		}
@@ -762,7 +755,8 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 		}
 		it_length--;//长度减1
 	}
-	else {//非超时包
+	else 
+	{//非超时包
 		rehid = old_id_table[i];//取原始ID
 		q_ip = client_ip[i];
 		for (int j = i; j < it_length - 1; j++)
@@ -800,7 +794,7 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 	if ((header->FLAGS & 0x000F) == 0x0003) 
 	{//RCODE为3表示域名出错
 		//printf("未查询到此域名\n\n");
-		printf("Non-existent domain\n\n");
+		//printf("Non-existent domain\n\n");
 	}
 	else 
 	{
