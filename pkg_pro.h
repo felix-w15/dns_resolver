@@ -101,6 +101,7 @@ int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const
 void insert_A_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength,const char *Address, int *length);//存储A类型记录
 
 void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, char *Type, char *Class, int TTL, int DataLength, char *CNAME, int *length);//存储CNAME类型记录
+int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *record, int tag);
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength, resRecord *record);//查询特定权威名记录
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, char *CNAME, int CNLength);////查询特定权威名记录重载
 

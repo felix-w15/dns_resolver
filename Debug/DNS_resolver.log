@@ -1,12 +1,20 @@
 ﻿  pkg_pro.cpp
+<<<<<<< HEAD
+e:\github\dns_resolver\pkg_pro.cpp(384): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  c:\program files (x86)\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: 参见“inet_addr”的声明
+e:\github\dns_resolver\pkg_pro.cpp(612): warning C4156: 未使用数组形式的“delete”删除数组表达式；数组形式被替代
+e:\github\dns_resolver\pkg_pro.cpp(612): warning C4154: 删除数组表达式；转换到提供的指针
+e:\github\dns_resolver\pkg_pro.cpp(425): warning C4996: 'inet_ntoa': Use inet_ntop() or InetNtop() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+=======
 e:\github\dns\dns_resolver\pkg_pro.cpp(383): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: 参见“inet_addr”的声明
 e:\github\dns\dns_resolver\pkg_pro.cpp(424): warning C4996: 'inet_ntoa': Use inet_ntop() or InetNtop() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+>>>>>>> 5c7b5cbbee2dd7cb456b87ad0fd357602ed4eca9
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\um\winsock2.h(1849): note: 参见“inet_ntoa”的声明
   SQLite3.lib(sqlite3.obj) : 找到 MSIL .netmodule 或使用 /GL 编译的模块；正在使用 /LTCG 重新启动链接；将 /LTCG 添加到链接命令行以改进链接器性能
 LINK : warning LNK4075: 忽略“/INCREMENTAL”(由于“/LTCG”规范)
 LINK : warning LNK4098: 默认库“MSVCRT”与其他库的使用冲突；请使用 /NODEFAULTLIB:library
   正在生成代码
   已完成代码的生成
-SQLite3.lib(sqlite3.obj) : warning LNK4204: “E:\github\DNS\dns_resolver\Debug\vc141.pdb”缺少引用模块的调试信息；正在链接对象，如同没有调试信息一样
-  DNS_resolver.vcxproj -> E:\github\DNS\dns_resolver\Debug\DNS_resolver.exe
+SQLite3.lib(sqlite3.obj) : warning LNK4204: “E:\github\dns_resolver\Debug\vc141.pdb”缺少引用模块的调试信息；正在链接对象，如同没有调试信息一样
+  DNS_resolver.vcxproj -> E:\github\dns_resolver\Debug\DNS_resolver.exe

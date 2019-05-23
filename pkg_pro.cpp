@@ -563,9 +563,8 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 		}
 		else
 		{
-			resRecord *cnameRecord;//存储cname类型记录
-			cnameRecord = new resRecord;
-			int queryCNameRes = query_CNAME_record(db, zErrMsg, doName, str_len(doName), cnameRecord);
+			resRecord cnameRecord[RESO_MAX];//存储cname类型记录
+			int queryCNameRes = query_CNAME_record(db, zErrMsg, doName, str_len(doName), cnameRecord, 1);
 			resRecord aRecord[RESO_MAX];//存储A类型记录
 			int queryAResult = query_A_record(db, zErrMsg, doName, str_len(doName), aRecord);
 			if (queryAResult)//本地数据库有缓存,给客户端发送response包
@@ -608,7 +607,8 @@ void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip)
 				delete cnameRecord->NAME;
 			if (!cnameRecord->RDATA)
 				delete cnameRecord->RDATA;
-			delete cnameRecord;
+			if (!cnameRecord)
+				delete cnameRecord;
 		}
 	}
 	else if (tp == 5)//CNAME请求
@@ -1334,6 +1334,52 @@ void insert_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, char *Alias, ch
 
 }
 
+int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *record, int tag)
+{//根据域名在CNAME_RECORD中查找数据
+	int ret = 0;
+	sqlite3_stmt *statement;
+	int sqlLength;
+	char sql[SQL_MAX] = "SELECT * from CNAME_RECORD where Name = '";
+	sqlLength = strlen(sql);
+	connect_string(sql, Name, sqlLength, nameLength);
+	sqlLength += nameLength;
+	connect_string(sql, "';", sqlLength, 2);
+	sqlite3_prepare(db, sql, -1, &statement, NULL);
+
+	if (ret != SQLITE_OK)
+	{
+		printf("prepare error ret : %d\n", ret);
+		return 0;
+	}
+	int res = 0;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		if (res == 0)
+		{
+			char* domainName1 = (char *)sqlite3_column_text(statement, 1);
+			unsigned short type = 5;//资源类型为CNAME类型
+			unsigned short cla = 1;//CLASS字段值为1
+			unsigned long TTL = (unsigned long)sqlite3_column_int(statement, 4);
+			unsigned short dataLen = (unsigned short)sqlite3_column_int(statement, 5);
+			char* cnameRecord = (char *)sqlite3_column_text(statement, 6);
+			int domainLen = str_len(domainName1);
+			int cnLen = str_len(cnameRecord);
+			record->NAME = new char[domainLen + 1];
+			memcpy(record->NAME, domainName1, domainLen);//拷贝N个字节到record-NAME
+			record->NAME[domainLen] = '\0';
+			record->RDATA = new char[cnLen + 1];
+			memcpy(record->RDATA, cnameRecord, cnLen);//拷贝N个字节到record-RDATA
+			record->RDATA[cnLen] = '\0';
+			record->TYPE = type;
+			record->CLASS = cla;
+			record->TTL = TTL;
+			record->DATALENGTH = dataLen;
+		}
+		res++;
+	}
+	return res;
+}
+
 int query_CNAME_record(sqlite3 *db, char *zErrMsg, char *Alias, int nameLength,  resRecord *record)
 {//根据域名在CNAME_RECORD中查找数据
 	int ret = 0;
@@ -1546,7 +1592,6 @@ int query_MX_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resR
 		memcpy(records[res].RDATA, mxServer, mxServerLen);//拷贝addrLen个字节到record-RDATA
 		records[res].RDATA[mxServerLen] = '\0';
 		records[res].PREFERENCE = preference;
-
 		res++;
 	}
 	return res;
