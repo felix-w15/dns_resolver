@@ -7,10 +7,9 @@
 long timestamp[IDTABLE_SIZE];//存放向上级请求包发出时间
 SOCKADDR_IN client_ip[IDTABLE_SIZE];//存放客户机的ip地址，用以发答复包以及并发处理
 stringstream sstream;//转换格式流
-map<string, unsigned short> *mapDomainName;//
+map<string, unsigned short> *mapDomainName;
 
 std::mutex mt;//互斥器
-
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName) {//打印错误信息相关
 	int i;
@@ -217,7 +216,6 @@ void cn_records_pro(resRecord record, char *sendBuf, int *bytePos)
 		unsigned short dataLen = domain_pro(newRecord.RDATA, sendBuf, bytePos);//求出data字段所占字节数
 		sendBuf[dataLenPos + 1] = (char)dataLen;
 		sendBuf[dataLenPos + 0] = dataLen >> 8;
-		domain_pro(newRecord.RDATA, sendBuf, bytePos);//域名处理
 		cname = newRecord.RDATA;//继续查询下一个CN
 	}
 }
@@ -1110,7 +1108,6 @@ void resp_pro(dns_header *header, char *receiveBuffer)
 	}
 }
 
-
 int do_name_reso(int clength, int addlength, int c_byte, char doname[], char *receivebuffer)
 {
 	int length = clength;//记录域名占用长度
@@ -1681,7 +1678,6 @@ int query_undesirable_web_record(sqlite3 *db, char *zErrMsg, char *Name, int nam
 	}
 	return res;
 }
-
 
 void delete_expired_data(sqlite3 *db, char *zErrMsg)
 {//定期删除数据库中超时的记录

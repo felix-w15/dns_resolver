@@ -95,7 +95,6 @@ void init_table(short int t[], short int q);//数组初始化
 void query_pro(dns_header *header, char *receiveBuffer, SOCKADDR_IN cli_ip);//请求包处理
 void query_for_superior_server(char *receiveBuffer, dns_header *header, SOCKADDR_IN cli_ip);//转发至高一级域名服务器
 void resp_pro(dns_header *header, char *receiveBuffer);//响应包处理
-void connect_string(char *a, char *b);//连接字符串
 
 int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, resRecord *records);//查询A类型记录
 int query_A_record(sqlite3 *db, char *zErrMsg, char *Name, int nameLength, const char *Address, int addLength);//查询A类型记录重载
